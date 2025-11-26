@@ -55,7 +55,7 @@ import { MailModule } from './mail/mail.module';
       secret: process.env.JWT_SECRET || 'your-secret-key',
       signOptions: { expiresIn: '7d' },
     }),
-    MailModule,
+    
   ],
   controllers: [AppController],
   providers: [AppService],

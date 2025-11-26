@@ -5,9 +5,12 @@ import {
   OneToMany,
   CreateDateColumn,
   UpdateDateColumn,
+  ManyToOne,
+  JoinColumn
 } from 'typeorm';
 import { Review } from 'src/review/entity/review.entity';
 import { Cart } from 'src/cart/entity/cart.entity';
+import { User } from 'src/user/entity/user.entity';
 
 @Entity('products')
 export class Product {
@@ -43,4 +46,15 @@ export class Product {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+
+  @Column({ nullable: true })
+  userId: string;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'userId' })
+  user: User;
+
+
 }
+
