@@ -25,6 +25,18 @@ import { Order } from 'src/order/entity/order.entity';
 import { Cart } from 'src/cart/entity/cart.entity';
 import { MailModule } from './mail/mail.module';
 
+// TODO: Add ConfigModule validation schema to enforce required environment variables
+// Example:
+// import * as Joi from 'joi';
+// ConfigModule.forRoot({
+//   validationSchema: Joi.object({
+//     DB_HOST: Joi.string().required(),
+//     DB_PORT: Joi.number().default(5432),
+//     JWT_SECRET: Joi.string().required(),
+//     // ... other required env vars
+//   }),
+// })
+
 
   @Module({
   imports: [AuthModule,
@@ -47,14 +59,22 @@ import { MailModule } from './mail/mail.module';
       password: process.env.DB_PASSWORD || 'postgres',
       database: process.env.DB_NAME || 'ecommerce',
       entities: [User, Admin, Product, Cart, Order, Review, Wallet, Transaction],
+      // FIXME: CRITICAL - Set synchronize to false in production!
+      // This can cause data loss. Use migrations instead:
+      // synchronize: process.env.NODE_ENV !== 'production',
+      // Also add: migrationsRun: true, migrations: ['dist/migrations/*.js']
       synchronize: true, 
     }),
     
     PassportModule,
     JwtModule.register({
+      // FIXME: CRITICAL - Never use fallback secrets! App should fail if JWT_SECRET is not set.
+      // Remove the fallback: secret: process.env.JWT_SECRET,
+      // Or use ConfigService with validation to ensure it exists
       secret: process.env.JWT_SECRET || 'your-secret-key',
       signOptions: { expiresIn: '7d' },
     }),
+    // FIXME: MailModule is imported twice (also at line 40). Remove this duplicate.
     MailModule,
   ],
   controllers: [AppController],

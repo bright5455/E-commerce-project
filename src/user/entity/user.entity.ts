@@ -6,6 +6,7 @@ import {
   UpdateDateColumn,
   OneToMany,
   OneToOne,
+  Index,
 } from 'typeorm';
 import { Exclude } from 'class-transformer';
 import { Wallet } from 'src/wallet/entity/wallet.entity';
@@ -13,11 +14,17 @@ import { Cart } from 'src/cart/entity/cart.entity';
 import { Order } from 'src/order/entity/order.entity';
 import { Review } from 'src/review/entity/review.entity';
 
+// TODO: Add @Index decorator for frequently queried fields
+// TODO: Consider adding soft delete with @DeleteDateColumn for data recovery
+// TODO: Add profile picture/avatar field
+
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  // TODO: Add @Index() decorator for faster email lookups during login
+  @Index()
   @Column({ unique: true })
   email: string;
 

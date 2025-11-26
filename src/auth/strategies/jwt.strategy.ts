@@ -14,6 +14,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
+      // FIXME: CRITICAL - Remove fallback secret! Use ConfigService instead:
+      // constructor(@InjectRepository(User) userRepository, private configService: ConfigService) {
+      //   super({ secretOrKey: configService.getOrThrow('JWT_SECRET'), ... });
+      // }
       secretOrKey: process.env.JWT_SECRET || 'your-secret-key',
     });
   }

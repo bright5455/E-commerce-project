@@ -9,6 +9,16 @@ import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { RegisterUserDto, LoginDto, ResetPasswordDto, ChangePasswordDto } from 'src/auth/dto/auth.dto';
 
+// TODO: This service has significant code duplication with AuthService
+// Consider creating a BaseAuthService abstract class with shared logic:
+// - Password hashing/comparison
+// - Token generation
+// - Email verification flow
+// - Password reset flow
+// Then have AuthService and AdminAuthService extend it
+
+// TODO: Admin registration should be restricted - implement invite-only or first-admin-setup flow
+
 @Injectable()
 export class AdminAuthService {
   constructor(
@@ -37,6 +47,8 @@ export class AdminAuthService {
 
     await this.adminRepository.save(admin);
 
+    // FIXME: Remove console.log in production! Use proper logging service
+    // TODO: Send verification email using MailService instead of logging token
     console.log(`Admin verification token: ${verificationToken}`);
 
     return {
@@ -178,6 +190,7 @@ export class AdminAuthService {
     admin.resetPasswordExpires = resetExpires;
     await this.adminRepository.save(admin);
 
+    // FIXME: Remove console.log in production! Send email using MailService
     console.log(`Admin reset token: ${resetToken}`);
 
     return { message: 'If the email exists, a reset link has been sent' };

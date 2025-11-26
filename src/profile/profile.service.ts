@@ -6,6 +6,10 @@ import { Admin } from 'src/admin-auth/entity/admin-auth.entity';
 import { UpdateProfileDto } from 'src/profile/dto/profile.dto';
 import { BadRequestException } from '@nestjs/common';
 
+// TODO: Use ClassSerializerInterceptor with @Exclude() decorators instead of manually
+// destructuring to remove sensitive fields. This is more maintainable.
+// Example: return plainToInstance(UserResponseDto, user, { excludeExtraneousValues: true });
+
 @Injectable()
 export class ProfileService {
   constructor(

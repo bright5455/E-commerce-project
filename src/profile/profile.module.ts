@@ -9,12 +9,13 @@ import { PassportModule } from '@nestjs/passport';
 import { UserModule } from 'src/user/user.module';
 import { Admin } from 'src/admin-auth/entity/admin-auth.entity';
 
-
 @Module({
-imports: [
+  imports: [
+    // TODO: ConfigModule.forRoot should only be called once in AppModule with isGlobal: true
+    // Remove this line - it's redundant since AppModule already sets it globally
     ConfigModule.forRoot({ isGlobal: true }),
 
-    TypeOrmModule.forFeature([User,Admin]),
+    TypeOrmModule.forFeature([User, Admin]),
 
     PassportModule.register({ defaultStrategy: 'jwt' }),
 
@@ -28,12 +29,11 @@ imports: [
     }),
 
     UserModule,
-        ProfileModule,
-        
-      ],
-
+    // FIXME: CRITICAL - Remove this circular import! ProfileModule cannot import itself.
+    // ProfileModule,
+  ],
 
   providers: [ProfileService],
-  controllers: [ProfileController]
+  controllers: [ProfileController],
 })
 export class ProfileModule {}

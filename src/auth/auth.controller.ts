@@ -3,6 +3,10 @@ import { AuthService } from './auth.service';
 import { RegisterUserDto, LoginDto, ResetPasswordDto, ChangePasswordDto } from './dto/auth.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guards';
 
+// TODO: Add @ApiTags('auth') and other Swagger decorators for documentation
+// TODO: Add @Throttle() decorator for rate limiting on login/register endpoints
+// TODO: Create a typed Request interface instead of using 'any' for req.user
+
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
@@ -34,7 +38,12 @@ export class AuthController {
 
   @Patch('change-password')
   @UseGuards(JwtAuthGuard)
+  // FIXME: Add proper typing for request: @Request() req: RequestWithUser
+  // Create interface: interface RequestWithUser extends Request { user: { id: string; email: string; } }
   async changePassword(@Request() req, @Body() changePasswordDto: ChangePasswordDto) {
     return this.authService.changePassword(req.user.id, changePasswordDto);
   }
+
+  // TODO: Add logout endpoint that invalidates refresh token
+  // TODO: Add refresh token endpoint: @Post('refresh')
 }
