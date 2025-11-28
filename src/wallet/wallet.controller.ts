@@ -1,31 +1,48 @@
-import { Controller, Get, Post, Body, UseGuards, Request } from '@nestjs/common';
-import { WalletService } from './wallet.service';
-import { AddFundsDto } from './dto/wallet.dto';
+import { Controller, Get, Post, Body, Query, UseGuards, Request } from '@nestjs/common';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guards';
+import { WalletService } from './wallet.service';
+import { AddFundsDto, TransferDto } from './dto/wallet.dto';
 
 @Controller('wallet')
 @UseGuards(JwtAuthGuard)
 export class WalletController {
-  constructor(private walletService: WalletService) {}
+  constructor(private readonly walletService: WalletService) {}
 
+  
   @Get()
-  async getWallet(@Request() req) {
-    return this.walletService.getWallet(req.user.id);
+  getWallet(@Request() req) {
+    return this.walletService.getBalance(req.user.id);
   }
 
-  @Post('add-funds')
-  async addFunds(@Request() req, @Body() addFundsDto: AddFundsDto) {
-    return this.walletService.addFunds(req.user.id, addFundsDto);
+  
+  @Post('deposit')
+  deposit(@Request() req, @Body() dto: AddFundsDto) {
+    return this.walletService.deposit(req.user.id, dto.amount, dto.description);
   }
 
-  @Post('purchase')
-  async purchaseCart(@Request() req) {
-    return this.walletService.purchaseCart(req.user.id);
+  
+  @Post('withdraw')
+  withdraw(@Request() req, @Body() dto: AddFundsDto) {
+    return this.walletService.withdraw(req.user.id, dto.amount, dto.description);
   }
 
+  
+  @Post('transfer')
+  transfer(@Request() req, @Body() dto: TransferDto) {
+    return this.walletService.transfer(req.user.id, dto.toUserId, dto.amount);
+  }
+
+  
   @Get('transactions')
   async getTransactions(@Request() req) {
-    return this.walletService.getTransactions(req.user.id);
+    return this.walletService.getTransactionHistory(req.user.id);
   }
-}
+
+  @Post('refund')
+  async refund(@Request() req, @Body() body) {
+    const { orderId, amount } = body;
+    return this.walletService.refund(req.user.id, orderId, amount);
+  };
+  
+  }
 

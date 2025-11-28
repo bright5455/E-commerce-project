@@ -28,7 +28,7 @@ imports: [
     }),
 
     UserModule,
-        ProfileModule,
+        
         
       ],
 
