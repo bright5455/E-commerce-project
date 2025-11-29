@@ -9,6 +9,11 @@ import { User } from 'src/user/entity/user.entity';
 import { Wallet } from 'src/wallet/entity/wallet.entity';
 import { MailService } from 'src/mail/mail.service';
 
+// TODO: Extract common auth logic into a BaseAuthService to reduce duplication with AdminAuthService
+// TODO: Add refresh token implementation for better security
+// TODO: Add rate limiting for login attempts to prevent brute force attacks
+// TODO: Consider using transactions when creating user + wallet to ensure data consistency
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -67,13 +72,16 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new UnauthorizedException(' credentials not found');
+      // FIXME: Inconsistent error message - remove extra space and use consistent wording
+      // Also consider using a generic message to prevent user enumeration attacks
+      throw new UnauthorizedException('Invalid email or password');
     }
 
     const isPasswordValid = await bcrypt.compare(loginDto.password, user.password);
 
     if (!isPasswordValid) {
-      throw new UnauthorizedException('credentials not found');
+      // TODO: Implement login attempt tracking and account lockout after X failed attempts
+      throw new UnauthorizedException('Invalid email or password');
     }
 
     if (!user.isEmailVerified) {
@@ -81,10 +89,15 @@ export class AuthService {
     }
 
     const payload = { sub: user.id, email: user.email, role: 'user' };
-    const accessToken = this.jwtService.sign(payload);
+    const accessToken = this.jwtService.sign(payload, { expiresIn: '1h' });
+
+    // TODO: Implement refresh token:
+    // const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
+    // Store refresh token in database for revocation capability
 
     return {
       accessToken,
+      // TODO: Create a UserResponseDto and use class-transformer to serialize
       user: {
         id: user.id,
         email: user.email,

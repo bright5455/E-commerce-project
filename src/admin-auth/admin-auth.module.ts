@@ -8,11 +8,15 @@ import { PassportModule } from '@nestjs/passport';
 import { AdminJwtStrategy } from 'src/auth/strategies/admin-jwt.strategy'; 
 import { MailModule } from 'src/mail/mail.module';
 
+// TODO: Consider restricting admin registration - only allow existing admins to create new admins
+// TODO: Add role-based permissions (super_admin, admin, moderator)
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([Admin]), 
     PassportModule,
     JwtModule.register({
+      // FIXME: CRITICAL - Remove fallback secret! Use ConfigService with validation
       secret: process.env.JWT_SECRET || 'your-secret-key',
       signOptions: { expiresIn: '7d' },
     }),

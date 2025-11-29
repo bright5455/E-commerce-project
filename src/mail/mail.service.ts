@@ -1,12 +1,18 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 
+// TODO: Consider using @nestjs-modules/mailer for better integration
+// TODO: Add email templates using handlebars or similar template engine
+
 @Injectable()
 export class MailService {
   private transporter: nodemailer.Transporter;
   private readonly logger = new Logger(MailService.name);
 
   constructor() {
+    // TODO: Use ConfigService instead of process.env for consistency
+    // TODO: Add validation to ensure mail config exists before creating transporter
+    // TODO: Add secure: true option for production (TLS)
     this.transporter = nodemailer.createTransport({
       host: process.env.MAIL_HOST,
       port: Number(process.env.MAIL_PORT),
@@ -35,6 +41,8 @@ export class MailService {
             </a>
             <p>Or copy and paste this link into your browser:</p>
             <p style="color: #666; word-break: break-all;">${verificationUrl}</p>
+            <!-- FIXME: SECURITY RISK - Remove raw token from email! The URL is sufficient. -->
+            <!-- Exposing tokens directly in emails is a security vulnerability -->
             <p>Your verification token: <strong>${token}</strong></p>
             <p style="color: #999; font-size: 12px; margin-top: 30px;">
               If you didn't create an account, please ignore this email.
@@ -68,6 +76,7 @@ export class MailService {
             </a>
             <p>Or copy and paste this link into your browser:</p>
             <p style="color: #666; word-break: break-all;">${resetUrl}</p>
+            <!-- FIXME: SECURITY RISK - Remove raw token from email! -->
             <p>Your reset token: <strong>${token}</strong></p>
             <p style="color: #999; font-size: 12px;">This link will expire in 1 hour.</p>
             <p style="color: #999; font-size: 12px; margin-top: 30px;">

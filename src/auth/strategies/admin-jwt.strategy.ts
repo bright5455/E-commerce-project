@@ -4,6 +4,7 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Admin } from 'src/admin-auth/entity/admin-auth.entity';
+
 @Injectable()
 export class AdminJwtStrategy extends PassportStrategy(Strategy, 'admin-jwt') {
   constructor(
@@ -13,6 +14,10 @@ export class AdminJwtStrategy extends PassportStrategy(Strategy, 'admin-jwt') {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
+      // FIXME: CRITICAL - Remove fallback secret! Use ConfigService instead:
+      // constructor(@InjectRepository(Admin) adminRepository, private configService: ConfigService) {
+      //   super({ secretOrKey: configService.getOrThrow('JWT_SECRET'), ... });
+      // }
       secretOrKey: process.env.JWT_SECRET || 'your-secret-key',
     });
   }
