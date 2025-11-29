@@ -1,9 +1,9 @@
-import { 
-  Injectable, 
-  ConflictException, 
-  NotFoundException, 
-  ForbiddenException 
-} from '@nestjs/common';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+  ForbiddenException
+} from "@nestjs/common";
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Review } from './entity/review.entity';
@@ -22,9 +22,9 @@ export class ReviewService {
     private orderRepository: Repository<Order>,
   ) {}
 
- 
+
   async create(userId: string, productId: string, createReviewDto: CreateReviewDto) {
-    
+
     const product = await this.productRepository.findOne({
       where: { id: productId },
     });
@@ -34,12 +34,12 @@ export class ReviewService {
     }
 
     const hasPurchased = await this.canUserReview(userId, productId);
-    
+
     if (!hasPurchased) {
       throw new ForbiddenException('You can only review products you have purchased');
     }
 
-   
+
     const existingReview = await this.reviewRepository.findOne({
       where: { userId, productId },
     });
@@ -48,7 +48,7 @@ export class ReviewService {
       throw new ConflictException('You have already reviewed this product');
     }
 
-   
+
     const review = this.reviewRepository.create({
       userId,
       productId,
@@ -64,7 +64,7 @@ export class ReviewService {
     };
   }
 
-  
+
   async findAllByProduct(productId: string, query: { page?: number; limit?: number; sortBy?: string; order?: 'ASC' | 'DESC' }) {
     const page = query.page || 1;
     const limit = query.limit || 10;
@@ -104,7 +104,7 @@ export class ReviewService {
     };
   }
 
-  
+
   async update(id: string, userId: string, updateReviewDto: UpdateReviewDto) {
     const review = await this.reviewRepository.findOne({
       where: { id, userId },
@@ -130,7 +130,7 @@ export class ReviewService {
     };
   }
 
-  
+
   async remove(id: string, userId: string) {
     const review = await this.reviewRepository.findOne({
       where: { id, userId },
@@ -147,7 +147,7 @@ export class ReviewService {
     };
   }
 
-  
+
   async getProductRating(productId: string): Promise<{ averageRating: number; totalReviews: number }> {
     const result = await this.reviewRepository
       .createQueryBuilder('review')
@@ -162,14 +162,14 @@ export class ReviewService {
     };
   }
 
- 
+
   async canUserReview(userId: string, productId: string): Promise<boolean> {
-   
+
     const order = await this.orderRepository
       .createQueryBuilder('order')
       .where('order.userId = :userId', { userId })
-      .andWhere('order.status IN (:...statuses)', { 
-        statuses: ['completed', 'delivered', 'pending', 'processing'] 
+      .andWhere('order.status IN (:...statuses)', {
+        statuses: ['completed', 'delivered', 'pending', 'processing']
       })
       .getOne();
 
@@ -177,7 +177,7 @@ export class ReviewService {
       return false;
     }
 
-    
+
     const orderItems = order.items as any[];
     const hasPurchased = orderItems.some((item: any) => item.productId === productId);
 
@@ -185,7 +185,7 @@ export class ReviewService {
       return false;
     }
 
-   
+
     const existingReview = await this.reviewRepository.findOne({
       where: { userId, productId },
     });

@@ -9,7 +9,7 @@ import {
   Query,
   UseGuards,
   Request,
-} from '@nestjs/common';
+} from "@nestjs/common";
 import { ReviewService } from './review.service';
 import { CreateReviewDto, UpdateReviewDto } from './dto/review.dto';
 import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guards';
@@ -18,7 +18,7 @@ import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guards';
 export class ReviewController {
   constructor(private reviewService: ReviewService) {}
 
-  
+
   @Post('product/:productId')
   @UseGuards(JwtAuthGuard)
   async create(
@@ -45,14 +45,14 @@ export class ReviewController {
     });
   }
 
-  
+
   @Get('user/my-reviews')
   @UseGuards(JwtAuthGuard)
   async findAllByUser(@Request() req) {
     return this.reviewService.findAllByUser(req.user.id);
   }
 
-  
+
   @Patch(':id')
   @UseGuards(JwtAuthGuard)
   async update(
@@ -63,28 +63,28 @@ export class ReviewController {
     return this.reviewService.update(id, req.user.id, updateReviewDto);
   }
 
-  
+
   @Delete(':id')
   @UseGuards(JwtAuthGuard)
   async remove(@Request() req, @Param('id') id: string) {
     return this.reviewService.remove(id, req.user.id);
   }
 
-  
+
   @Get('product/:productId/rating')
   async getProductRating(@Param('productId') productId: string) {
     return this.reviewService.getProductRating(productId);
   }
 
-  
+
   @Get('product/:productId/can-review')
   @UseGuards(JwtAuthGuard)
   async canUserReview(@Request() req, @Param('productId') productId: string) {
     const canReview = await this.reviewService.canUserReview(req.user.id, productId);
     return {
       canReview,
-      message: canReview 
-        ? 'You can review this product' 
+      message: canReview
+        ? 'You can review this product'
         : 'You must purchase this product before reviewing or you have already reviewed it',
     };
   }
