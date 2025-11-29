@@ -6,17 +6,21 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   ManyToOne,
-  JoinColumn
+  JoinColumn,
+  Index,
+  Check,
 } from 'typeorm';
 import { Review } from 'src/review/entity/review.entity';
 import { Cart } from 'src/cart/entity/cart.entity';
 import { User } from 'src/user/entity/user.entity';
 
 @Entity('products')
+@Check(`"stock" >= 0`) 
 export class Product {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Index() 
   @Column()
   name: string;
 
@@ -32,8 +36,16 @@ export class Product {
   @Column({ nullable: true })
   imageUrl: string;
 
+  @Index() 
   @Column({ default: true })
   isActive: boolean;
+
+  @Column({ nullable: true })
+  userId: string;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'userId' })
+  user: User;
 
   @OneToMany(() => Review, review => review.product)
   reviews: Review[];
@@ -48,13 +60,4 @@ export class Product {
   updatedAt: Date;
 
 
-  @Column({ nullable: true })
-  userId: string;
-
-  @ManyToOne(() => User, { nullable: true })
-  @JoinColumn({ name: 'userId' })
-  user: User;
-
-
 }
-
