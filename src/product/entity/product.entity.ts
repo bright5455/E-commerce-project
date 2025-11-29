@@ -5,23 +5,22 @@ import {
   OneToMany,
   CreateDateColumn,
   UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
   Index,
+  Check,
 } from 'typeorm';
 import { Review } from 'src/review/entity/review.entity';
 import { Cart } from 'src/cart/entity/cart.entity';
-
-// TODO: Add Category entity and ManyToOne relationship
-// TODO: Add ProductImage entity for multiple images (OneToMany)
-// TODO: Add product variants (size, color, etc.) entity
-// TODO: Add SKU (Stock Keeping Unit) field for inventory management
-// TODO: Consider adding compareAtPrice for sale/discount display
+import { User } from 'src/user/entity/user.entity';
 
 @Entity('products')
+@Check(`"stock" >= 0`)
 export class Product {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Index() // For product search functionality
+  @Index()
   @Column()
   name: string;
 
@@ -32,16 +31,21 @@ export class Product {
   price: number;
 
   @Column({ default: 0 })
-  // TODO: Add check constraint to prevent negative stock
   stock: number;
 
-  // TODO: Change to support multiple images - create ProductImage entity
   @Column({ nullable: true })
   imageUrl: string;
 
-  @Index() // For filtering active products
+  @Index()
   @Column({ default: true })
   isActive: boolean;
+
+  @Column({ nullable: true })
+  userId: string;
+
+  @ManyToOne(() => User, { nullable: true })
+  @JoinColumn({ name: 'userId' })
+  user: User;
 
   @OneToMany(() => Review, review => review.product)
   reviews: Review[];
@@ -54,4 +58,6 @@ export class Product {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+
 }

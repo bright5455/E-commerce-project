@@ -3,6 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { ConfigService } from '@nestjs/config';
 import { Admin } from 'src/admin-auth/entity/admin-auth.entity';
 
 @Injectable()
@@ -10,6 +11,7 @@ export class AdminJwtStrategy extends PassportStrategy(Strategy, 'admin-jwt') {
   constructor(
     @InjectRepository(Admin)
     private adminRepository: Repository<Admin>,
+    private configService: ConfigService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -18,7 +20,7 @@ export class AdminJwtStrategy extends PassportStrategy(Strategy, 'admin-jwt') {
       // constructor(@InjectRepository(Admin) adminRepository, private configService: ConfigService) {
       //   super({ secretOrKey: configService.getOrThrow('JWT_SECRET'), ... });
       // }
-      secretOrKey: process.env.JWT_SECRET || 'your-secret-key',
+      secretOrKey: configService.getOrThrow('JWT_SECRET'),
     });
   }
 

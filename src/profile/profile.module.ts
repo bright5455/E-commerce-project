@@ -29,9 +29,10 @@ import { Admin } from 'src/admin-auth/entity/admin-auth.entity';
     }),
 
     UserModule,
-    // FIXME: CRITICAL - Remove this circular import! ProfileModule cannot import itself.
-    // ProfileModule,
-  ],
+
+        
+      ],
+
 
   providers: [ProfileService],
   controllers: [ProfileController],

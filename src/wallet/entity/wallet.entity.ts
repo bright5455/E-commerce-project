@@ -23,8 +23,13 @@ export class Wallet {
   @Column()
   userId: string;
 
-  @Column('decimal', { precision: 10, scale: 2, default: 0 })
-  balance: number;
+  
+  @Column('decimal', { precision: 12, scale: 2, transformer: {
+  to: (value: number) => value,
+  from: (value: string) => Number(value)
+}})
+balance: number;
+
 
   @OneToMany(() => Transaction, transaction => transaction.wallet)
   transactions: Transaction[];
