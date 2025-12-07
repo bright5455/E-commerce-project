@@ -1,42 +1,16 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, LessThanOrEqual } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Product } from './entity/product.entity';
 import { CreateProductDto, UpdateProductDto } from './dto/product.dto';
-
-// TODO: Implement ProductService with the following methods:
-// - create(createProductDto): Create a new product (admin only)
-// - findAll(query): List products with pagination, filtering, and sorting
-// - findOne(id): Get single product by ID
-// - update(id, updateProductDto): Update product (admin only)
-// - remove(id): Soft delete product (admin only)
-// - search(query): Full-text search for products
-// - findByCategory(categoryId): Filter products by category
-// - updateStock(id, quantity): Update product stock (for orders)
-// - getTopSelling(): Get best-selling products
-// - getLowStock(): Get products with low stock (admin dashboard)
 
 @Injectable()
 export class ProductService {
   constructor(
     @InjectRepository(Product)
-    private productRepository: Repository<Product>,
+    private readonly productRepository: Repository<Product>,
   ) {}
 
-  
-  async create(createProductDto: CreateProductDto) {
-    const product = this.productRepository.create({
-      ...createProductDto,
-      isActive: true,
-    });
-    
-    await this.productRepository.save(product);
-
-    return {
-      message: 'Product created successfully',
-      product,
-    };
-  }
 
   async findAll(query: {
     page?: number;
@@ -57,7 +31,6 @@ export class ProductService {
       .leftJoinAndSelect('product.reviews', 'reviews')
       .leftJoinAndSelect('product.user', 'user');
 
-    
     if (query.isActive !== undefined) {
       queryBuilder.andWhere('product.isActive = :isActive', { isActive: query.isActive });
     } else {
@@ -71,7 +44,6 @@ export class ProductService {
       );
     }
 
-    
     if (query.minPrice) {
       queryBuilder.andWhere('product.price >= :minPrice', { minPrice: query.minPrice });
     }
@@ -79,12 +51,10 @@ export class ProductService {
       queryBuilder.andWhere('product.price <= :maxPrice', { maxPrice: query.maxPrice });
     }
 
-    // Sorting
     const sortBy = query.sortBy || 'createdAt';
     const order = query.order || 'DESC';
     queryBuilder.orderBy(`product.${sortBy}`, order);
 
-    // Pagination
     queryBuilder.skip(skip).take(limit);
 
     const [products, total] = await queryBuilder.getManyAndCount();
@@ -98,7 +68,6 @@ export class ProductService {
     };
   }
 
- 
   async findOne(id: string) {
     const product = await this.productRepository.findOne({
       where: { id },
@@ -110,40 +79,6 @@ export class ProductService {
     }
 
     return product;
-  }
-
-  // Update product (admin only)
-  async update(id: string, updateProductDto: UpdateProductDto) {
-    const product = await this.productRepository.findOne({ where: { id } });
-
-    if (!product) {
-      throw new NotFoundException('Product not found');
-    }
-
-    Object.assign(product, updateProductDto);
-    await this.productRepository.save(product);
-
-    return {
-      message: 'Product updated successfully',
-      product,
-    };
-  }
-
-  
-  async remove(id: string) {
-    const product = await this.productRepository.findOne({ where: { id } });
-
-    if (!product) {
-      throw new NotFoundException('Product not found');
-    }
-
-    
-    product.isActive = false;
-    await this.productRepository.save(product);
-
-    return {
-      message: 'Product deleted successfully',
-    };
   }
 
   async search(query: string) {
@@ -168,15 +103,67 @@ export class ProductService {
     };
   }
 
-  
-  async findByCategory(categoryId: string) {
-  
-    throw new BadRequestException('Category filtering not yet implemented');
-    
-    
+  async getTopSelling(limit: number = 10) {
+    const products = await this.productRepository.find({
+      where: { isActive: true },
+      relations: ['reviews'],
+      order: { createdAt: 'DESC' },
+      take: limit,
+    });
+
+    return products;
   }
 
- 
+  async getLowStock(threshold: number = 10) {
+    const products = await this.productRepository
+      .createQueryBuilder('product')
+      .where('product.stock <= :threshold', { threshold })
+      .andWhere('product.isActive = :isActive', { isActive: true })
+      .orderBy('product.stock', 'ASC')
+      .getMany();
+
+    return {
+      products,
+      count: products.length,
+      threshold,
+    };
+  }
+
+  async findByCategory(categoryId: string) {
+    throw new BadRequestException('Category filtering not yet implemented');
+  }
+
+  async create(createProductDto: CreateProductDto) {
+    const product = this.productRepository.create({
+      ...createProductDto,
+      isActive: true,
+    });
+    
+    await this.productRepository.save(product);
+
+    return {
+      message: 'Product created successfully',
+      product,
+    };
+  }
+
+
+  async update(id: string, updateProductDto: UpdateProductDto) {
+    const product = await this.productRepository.findOne({ where: { id } });
+
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    Object.assign(product, updateProductDto);
+    await this.productRepository.save(product);
+
+    return {
+      message: 'Product updated successfully',
+      product,
+    };
+  }
+
   async updateStock(id: string, quantity: number) {
     const product = await this.productRepository.findOne({ where: { id } });
 
@@ -199,32 +186,19 @@ export class ProductService {
     };
   }
 
-  async getTopSelling(limit: number = 10) {
-    
-    const products = await this.productRepository.find({
-      where: { isActive: true },
-      relations: ['reviews'],
-      order: { createdAt: 'DESC' },
-      take: limit,
-    });
-
-   
-    return products;
-  }
-
   
-  async getLowStock(threshold: number = 10) {
-    const products = await this.productRepository
-      .createQueryBuilder('product')
-      .where('product.stock <= :threshold', { threshold })
-      .andWhere('product.isActive = :isActive', { isActive: true })
-      .orderBy('product.stock', 'ASC')
-      .getMany();
+  async remove(id: string) {
+    const product = await this.productRepository.findOne({ where: { id } });
+
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    product.isActive = false;
+    await this.productRepository.save(product);
 
     return {
-      products,
-      count: products.length,
-      threshold,
+      message: 'Product deleted successfully',
     };
   }
 }

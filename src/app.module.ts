@@ -8,23 +8,15 @@ import { CartModule } from './cart/cart.module';
 import { OrderModule } from './order/order.module';
 import { ReviewModule } from './review/review.module';
 import { UserModule } from './user/user.module';
-import { AdminAuthModule } from './admin-auth/admin-auth.module';
 import { TransactionModule } from './transaction/transaction.module';
 import { ProfileModule } from './profile/profile.module';
 import { MailModule } from './mail/mail.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import * as Joi from 'joi';
-import { User } from 'src/user/entity/user.entity';
-import { Transaction } from 'src/transaction/entity/transaction.entity';
-import { Admin } from 'src/admin-auth/entity/admin-auth.entity';
-import { Wallet } from 'src/wallet/entity/wallet.entity';
-import { Product } from 'src/product/entity/product.entity';
-import { Review } from 'src/review/entity/review.entity';
-import { Order } from 'src/order/entity/order.entity';
-import { Cart } from 'src/cart/entity/cart.entity';
 
 @Module({
   imports: [
@@ -37,9 +29,7 @@ import { Cart } from 'src/cart/entity/cart.entity';
         DB_PASSWORD: Joi.string().allow('').default(''),
         DB_NAME: Joi.string().required(),
 
-
         JWT_SECRET: Joi.string().required(),
-
 
         MAIL_HOST: Joi.string().required(),
         MAIL_PORT: Joi.number().default(2525),
@@ -47,9 +37,7 @@ import { Cart } from 'src/cart/entity/cart.entity';
         MAIL_PASS: Joi.string().required(),
         MAIL_FROM: Joi.string().required(),
 
-
         FRONTEND_URL: Joi.string().uri().default('http://localhost:3000'),
-
 
         NODE_ENV: Joi.string()
           .valid('development', 'production', 'test')
@@ -61,34 +49,38 @@ import { Cart } from 'src/cart/entity/cart.entity';
       },
     }),
 
-
-    TypeOrmModule.forRoot({
-      type: 'postgres',
-      host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT ?? '5432', 10),
-      username: process.env.DB_USERNAME || 'postgres',
-      password: process.env.DB_PASSWORD || '',
-      database: process.env.DB_NAME || 'ecommerce',
-      entities: [User, Admin, Product, Cart, Order, Review, Wallet, Transaction],
-      // FIXME: CRITICAL - Set synchronize to false in production!
-      // This can cause data loss. Use migrations instead:
-      // synchronize: process.env.NODE_ENV !== 'production',
-      // Also add: migrationsRun: true, migrations: ['dist/migrations/*.js']
-      synchronize: process.env.NODE_ENV !== 'production',
-      logging: process.env.NODE_ENV === 'development',
+    TypeOrmModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => ({
+        type: 'postgres',
+        host: configService.get<string>('DB_HOST'),
+        port: configService.get<number>('DB_PORT'),
+        username: configService.get<string>('DB_USERNAME'),
+        password: configService.get<string>('DB_PASSWORD'),
+        database: configService.get<string>('DB_NAME'),
+        entities: [__dirname + '/**/*.entity{.ts,.js}'],
+        synchronize: false, 
+        migrationsRun: true, 
+        migrations: [__dirname + '/migrations/**/*{.ts,.js}'], 
+        migrationsTableName: 'migrations', 
+        
+        logging: configService.get<string>('NODE_ENV') === 'development',
+      }),
     }),
 
     PassportModule,
-
-    JwtModule.register({
-      // FIXME: CRITICAL - Never use fallback secrets! App should fail if JWT_SECRET is not set.
-      // Remove the fallback: secret: process.env.JWT_SECRET,
-      // Or use ConfigService with validation to ensure it exists
-      secret: process.env.JWT_SECRET || 'your-secret-key',
-      signOptions: { expiresIn: '7d' },
+    JwtModule.registerAsync({
+      useFactory: () => {
+        if (!process.env.JWT_SECRET) {
+          throw new Error('JWT_SECRET is missing! Set it in your environment variables.');
+        }
+        return {
+          secret: process.env.JWT_SECRET,
+          signOptions: { expiresIn: '7d' },
+        };
+      },
     }),
-    // FIXME: MailModule is imported twice (also at line 40). Remove this duplicate.
-
 
     AuthModule,
     WalletModule,
@@ -97,10 +89,10 @@ import { Cart } from 'src/cart/entity/cart.entity';
     OrderModule,
     ReviewModule,
     UserModule,
-    AdminAuthModule,
     TransactionModule,
     ProfileModule,
     MailModule,
+    CloudinaryModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,57 +1,117 @@
 import {
   Entity,
-  PrimaryGeneratedColumn,
   Column,
-  ManyToOne,
+  PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
-  Index,
+  ManyToOne,
+  OneToMany,
+  JoinColumn,
 } from 'typeorm';
-import { User } from 'src/user/entity/user.entity';
+import { User } from '../../user/entity/user.entity';
+import { OrderItem } from '../../order/entity/order-item.entity';
 
-// TODO: Create a proper interface for order items instead of using 'any'
-// interface OrderItem {
-//   productId: string;
-//   productName: string;
-//   quantity: number;
-//   priceAtPurchase: number;
-// }
+export enum OrderStatus {
+  PENDING = 'pending',
+  PROCESSING = 'processing',
+  SHIPPED = 'shipped',
+  DELIVERED = 'delivered',
+  CANCELLED = 'cancelled',
+  COMPLETED = 'completed',
+}
 
-// TODO: Consider creating an OrderItem entity with a proper relationship
-// instead of storing items as JSON (better for querying and reporting)
-
-// TODO: Add enum for order status instead of plain string
-// export enum OrderStatus {
-//   PENDING = 'pending',
-//   CONFIRMED = 'confirmed',
-//   SHIPPED = 'shipped',
-//   DELIVERED = 'delivered',
-//   CANCELLED = 'cancelled',
-// }
+export enum PaymentMethod {
+  WALLET = 'wallet',
+  CARD = 'card',
+  BANK_TRANSFER = 'bank_transfer',
+}
 
 @Entity('orders')
 export class Order {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ManyToOne(() => User, user => user.orders, { onDelete: 'CASCADE' })
-  user: User;
-
-  @Index() // TODO: Add index for faster user order lookups
-  @Column()
+  @Column({ type: 'uuid' })
   userId: string;
 
-  @Column('decimal', { precision: 10, scale: 2 })
-  totalAmount: number;
+  @ManyToOne(() => User, { eager: false })
+  @JoinColumn({ name: 'userId' })
+  user: User;
 
-  @Index() // TODO: Add index for filtering orders by status
-  @Column({ default: 'pending' })
-  // TODO: Use enum type: @Column({ type: 'enum', enum: OrderStatus, default: OrderStatus.PENDING })
-  status: string;
+  @OneToMany(() => OrderItem, (orderItem) => orderItem.order, {
+    cascade: true,
+    eager: true,
+  })
+  items: OrderItem[];
 
-  // FIXME: Avoid using 'any' type - create proper OrderItem interface
-  @Column('jsonb')
-  items: any[];
+  
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  subtotal: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  tax: number;
+
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  shippingFee: number;
+
+  
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  total: number;
+
+  @Column({
+    type: 'enum',
+    enum: OrderStatus,
+    default: OrderStatus.PENDING,
+  })
+  status: OrderStatus;
+
+  @Column({
+    type: 'enum',
+    enum: PaymentMethod,
+    default: PaymentMethod.WALLET,
+  })
+  paymentMethod: PaymentMethod;
+
+  @Column({ default: false })
+  isPaid: boolean;
+
+  @Column({ type: 'timestamp', nullable: true })
+  paidAt: Date;
+
+  @Column({nullable: true})
+  shippingAddress: string;
+
+  @Column({nullable: true})
+  shippingCity: string;
+
+  @Column({nullable: true})
+  shippingState: string;
+
+  @Column({nullable: true})
+  shippingZipCode: string;
+
+  @Column({nullable: true})
+  shippingCountry: string;
+
+  @Column({ nullable: true })
+  phoneNumber: string;
+  @Column({ nullable: true })
+  trackingNumber: string;
+
+  @Column({ type: 'timestamp', nullable: true })
+  shippedAt: Date;
+
+  @Column({ type: 'timestamp', nullable: true })
+  deliveredAt: Date;
+
+  @Column({ type: 'timestamp', nullable: true })
+  cancelledAt: Date;
+
+  @Column({ nullable: true })
+  cancellationReason: string;
+
+  @Column({ type: 'text', nullable: true })
+  notes: string;
 
   @CreateDateColumn()
   createdAt: Date;

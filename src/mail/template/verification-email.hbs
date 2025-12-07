@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verify Your Email</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td align="center" style="padding: 40px 0;">
+        <table role="presentation" style="width: 600px; border-collapse: collapse; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+          
+    
+          <tr>
+            <td style="background-color: #4CAF50; padding: 40px; text-align: center;">
+              <h1 style="color: #ffffff; margin: 0; font-size: 28px;">Welcome to Our Store!</h1>
+            </td>
+          </tr>
+          
+      
+          <tr>
+            <td style="padding: 40px;">
+              <h2 style="color: #333333; margin-top: 0;">Verify Your Email Address</h2>
+              
+              <p style="color: #555555; line-height: 1.6; font-size: 16px;">
+                Hello,
+              </p>
+              
+              <p style="color: #555555; line-height: 1.6; font-size: 16px;">
+                Thank you for registering with us! To complete your registration and access all features, 
+                please verify your email address by clicking the button below:
+              </p>
+              
+            
+              <table role="presentation" style="margin: 30px 0;">
+                <tr>
+                  <td align="center">
+                    <a href="{{verificationUrl}}" 
+                       style="display: inline-block; padding: 16px 36px; background-color: #4CAF50; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
+                      Verify Email Address
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              
+              <p style="color: #777777; font-size: 14px; line-height: 1.6;">
+                Or copy and paste this link into your browser:
+              </p>
+              
+              <p style="color: #4CAF50; word-break: break-all; font-size: 12px; background-color: #f9f9f9; padding: 10px; border-radius: 4px;">
+                {{verificationUrl}}
+              </p>
+              
+          
+              <table role="presentation" style="margin: 30px 0; background-color: #fff3cd; border-left: 4px solid #ffc107;">
+                <tr>
+                  <td style="padding: 15px;">
+                    <p style="color: #856404; margin: 0; font-size: 14px;">
+                      <strong>⚠️ Security Tip:</strong> This verification link is unique to you. 
+                      Never share it with anyone.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              
+              <hr style="border: none; border-top: 1px solid #dddddd; margin: 30px 0;">
+              
+              <p style="color: #999999; font-size: 12px; line-height: 1.6;">
+                If you didn't create an account with us, you can safely ignore this email.
+              </p>
+            </td>
+          </tr>
+          
+      
+          <tr>
+            <td style="background-color: #f9f9f9; padding: 30px; text-align: center;">
+              <p style="color: #999999; font-size: 12px; margin: 0;">
+                &copy; {{currentYear}} E-Commerce Store. All rights reserved.
+              </p>
+              <p style="color: #999999; font-size: 12px; margin: 10px 0 0 0;">
+                This is an automated message. Please do not reply to this email.
+              </p>
+            </td>
+          </tr>
+          
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

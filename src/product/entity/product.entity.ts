@@ -10,9 +10,9 @@ import {
   Index,
   Check,
 } from 'typeorm';
-import { Review } from 'src/review/entity/review.entity';
-import { Cart } from 'src/cart/entity/cart.entity';
-import { User } from 'src/user/entity/user.entity';
+import { Review } from '../../review/entity/review.entity';
+import { Cart } from '../../cart/entity/cart.entity';
+import { User } from '../../user/entity/user.entity';
 
 @Entity('products')
 @Check(`"stock" >= 0`)

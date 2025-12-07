@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Account Verification</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f4f4f4;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse;">
+    <tr>
+      <td align="center" style="padding: 40px 0;">
+        <table role="presentation" style="width: 600px; border-collapse: collapse; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+          
+          
+          <tr>
+            <td style="background-color: #2196F3; padding: 40px; text-align: center;">
+              <h1 style="color: #ffffff; margin: 0; font-size: 28px;">🛡️ Admin Access Granted</h1>
+            </td>
+          </tr>
+          
+          
+          <tr>
+            <td style="padding: 40px;">
+              <h2 style="color: #333333; margin-top: 0;">Welcome, Administrator!</h2>
+              
+              <p style="color: #555555; line-height: 1.6; font-size: 16px;">
+                Hello,
+              </p>
+              
+              <p style="color: #555555; line-height: 1.6; font-size: 16px;">
+                You have been granted <strong>administrator access</strong> to our platform. 
+                Please verify your email address to activate your admin account and access the dashboard.
+              </p>
+              
+              
+              <table role="presentation" style="margin: 30px 0;">
+                <tr>
+                  <td align="center">
+                    <a href="{{verificationUrl}}" 
+                       style="display: inline-block; padding: 16px 36px; background-color: #2196F3; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
+                      Verify Admin Account
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              
+              <p style="color: #777777; font-size: 14px; line-height: 1.6;">
+                Or copy and paste this link into your browser:
+              </p>
+              
+              <p style="color: #2196F3; word-break: break-all; font-size: 12px; background-color: #f9f9f9; padding: 10px; border-radius: 4px;">
+                {{verificationUrl}}
+              </p>
+              
+          
+              <table role="presentation" style="margin: 30px 0; background-color: #e3f2fd; border-left: 4px solid #2196F3;">
+                <tr>
+                  <td style="padding: 15px;">
+                    <p style="color: #1565c0; margin: 0 0 10px 0; font-size: 14px;">
+                      <strong>🔐 Admin Privileges:</strong>
+                    </p>
+                    <ul style="color: #1565c0; margin: 0; padding-left: 20px; font-size: 14px;">
+                      <li>Access to admin dashboard</li>
+                      <li>User management capabilities</li>
+                      <li>System configuration access</li>
+                      <li>Enhanced security features (2FA required)</li>
+                    </ul>
+                  </td>
+                </tr>
+              </table>
+              
+            
+              <table role="presentation" style="margin: 30px 0; background-color: #fff3cd; border-left: 4px solid #ffc107;">
+                <tr>
+                  <td style="padding: 15px;">
+                    <p style="color: #856404; margin: 0; font-size: 14px;">
+                      <strong>⚠️ Security Reminder:</strong> As an administrator, you have elevated privileges. 
+                      Please keep your credentials secure and enable two-factor authentication after your first login.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              
+              <hr style="border: none; border-top: 1px solid #dddddd; margin: 30px 0;">
+              
+              <p style="color: #999999; font-size: 12px; line-height: 1.6;">
+                If you didn't request or expect admin access, please contact the system administrator immediately at 
+                <a href="mailto:admin@ecommerce.com" style="color: #2196F3;">admin@ecommerce.com</a>
+              </p>
+            </td>
+          </tr>
+          
+          <tr>
+            <td style="background-color: #f9f9f9; padding: 30px; text-align: center;">
+              <p style="color: #999999; font-size: 12px; margin: 0;">
+                &copy; {{currentYear}} E-Commerce Store - Admin Portal. All rights reserved.
+              </p>
+              <p style="color: #999999; font-size: 12px; margin: 10px 0 0 0;">
+                This is an automated message. Please do not reply to this email.
+              </p>
+            </td>
+          </tr>
+          
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

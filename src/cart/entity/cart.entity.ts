@@ -6,15 +6,15 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { User } from 'src/user/entity/user.entity';
-import { Product } from 'src/product/entity/product.entity';
+import { User } from '../../user/entity/user.entity';
+import { Product } from '../../product/entity/product.entity';
 
 @Entity('cart')
 export class Cart {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ManyToOne(() => User, user => user.cartItems, { onDelete: 'CASCADE' })
+  @ManyToOne(() => User, user => user.cart, { onDelete: 'CASCADE' })
   user: User;
 
   @Column()

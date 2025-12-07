@@ -1,50 +1,127 @@
-import { Controller } from '@nestjs/common';
-import { Get, Patch, Body, UseGuards, Request } from '@nestjs/common';
-import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guards';
-import { ProfileService } from 'src/profile/profile.service';
-import { UpdateProfileDto } from 'src/profile/dto/profile.dto';
-import { AdminJwtAuthGuard } from 'src/auth/guards/admin-jwt-auth.guards';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Body,
+  UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  ClassSerializerInterceptor,
+  ParseFilePipe,
+  MaxFileSizeValidator,
+  FileTypeValidator,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiResponse,
+  ApiConsumes,
+  ApiBody,
+} from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { Throttle } from '@nestjs/throttler';
+import { memoryStorage } from 'multer';
+import { ProfileService } from './profile.service';
+import { UpdateProfileDto } from './dto/profile.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/role.decorator';
+import { User } from '../auth/decorators/user.decorator';
+import { UserRole } from '../user/entity/user.entity';
 
-// TODO: Add Swagger decorators for API documentation
-// TODO: Create typed request interface for better type safety
-
+@ApiTags('profile')
 @Controller('profile')
+@UseGuards(JwtAuthGuard)
+@UseInterceptors(ClassSerializerInterceptor)
+@ApiBearerAuth()
 export class ProfileController {
-  constructor(private profileService: ProfileService) {}
+  constructor(private readonly profileService: ProfileService) {}
 
+ 
   @Get()
-  @UseGuards(JwtAuthGuard)
-  // FIXME: Add proper typing: @Request() req: RequestWithUser
-  async getUserProfile(@Request() req) {
-    return this.profileService.getUserProfile(req.user.id);
+  @ApiOperation({ summary: 'Get current user profile' })
+  @ApiResponse({ status: 200, description: 'User profile retrieved successfully' })
+  async getUser(@User('id') userId: string) {
+    return this.profileService.getUserProfile(userId);
   }
 
   @Patch()
-  @UseGuards(JwtAuthGuard)
-  async updateUserProfile(@Request() req, @Body() updateProfileDto: UpdateProfileDto) {
-    return this.profileService.updateUserProfile(req.user.id, updateProfileDto);
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @ApiOperation({ summary: 'Update user profile' })
+  @ApiResponse({ status: 200, description: 'Profile updated successfully' })
+  async updateUser(@User('id') userId: string, @Body() dto: UpdateProfileDto) {
+    return this.profileService.updateUserProfile(userId, dto);
   }
 
+  @Post('avatar')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 5 * 1024 * 1024 }, 
+    }),
+  )
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Upload profile avatar' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'Profile avatar image (PNG, JPG, JPEG, WEBP - Max 5MB)',
+        },
+      },
+    },
+  })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Avatar uploaded successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string' },
+        avatarUrl: { type: 'string' },
+      },
+    },
+  })
+  @ApiResponse({ status: 400, description: 'Invalid file type or size' })
+  async uploadAvatar(
+    @User('id') userId: string,
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), 
+          new FileTypeValidator({ fileType: /^image\/(png|jpe?g|webp)$/ }),
+        ],
+        fileIsRequired: true,
+      }),
+    )
+    file: Express.Multer.File,
+  ) {
+    return this.profileService.uploadAvatar(userId, file);
+  }
+
+  
   @Get('admin')
-  @UseGuards(AdminJwtAuthGuard)
-  async getAdminProfile(@Request() req) {
-    return this.profileService.getAdminProfile(req.user.id);
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MODERATOR)
+  @ApiOperation({ summary: 'Get admin profile (Admin only)' })
+  @ApiResponse({ status: 200, description: 'Admin profile retrieved successfully' })
+  async getAdmin(@User('id') adminId: string) {
+    return this.profileService.getAdminProfile(adminId);
   }
 
   @Patch('admin')
-  @UseGuards(AdminJwtAuthGuard)
-  async updateAdminProfile(
-    @Request() req,
-    @Body() updateProfileDto: UpdateProfileDto,
-  ) {
-    return this.profileService.updateAdminProfile(req.user.id, updateProfileDto);
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MODERATOR)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @ApiOperation({ summary: 'Update admin profile (Admin only)' })
+  @ApiResponse({ status: 200, description: 'Admin profile updated successfully' })
+  async updateAdmin(@User('id') adminId: string, @Body() dto: UpdateProfileDto) {
+    return this.profileService.updateAdminProfile(adminId, dto);
   }
-
-  // TODO: Add endpoint for profile picture upload
-  // @Post('avatar')
-  // @UseGuards(JwtAuthGuard)
-  // @UseInterceptors(FileInterceptor('file'))
-  // async uploadAvatar(@Request() req, @UploadedFile() file) { ... }
 }
-
-

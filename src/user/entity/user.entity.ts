@@ -1,35 +1,35 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  CreateDateColumn,
-  UpdateDateColumn,
+import { 
+  Entity, 
+  Column, 
+  PrimaryGeneratedColumn, 
+  CreateDateColumn, 
+  UpdateDateColumn, 
   OneToMany,
-  OneToOne,
-  Index,
+  OneToOne
 } from 'typeorm';
 import { Exclude } from 'class-transformer';
-import { Wallet } from 'src/wallet/entity/wallet.entity';
-import { Cart } from 'src/cart/entity/cart.entity';
-import { Order } from 'src/order/entity/order.entity';
-import { Review } from 'src/review/entity/review.entity';
+import { Cart } from '../../cart/entity/cart.entity';
+import { Order } from '../../order/entity/order.entity';
+import { Review } from '../../review/entity/review.entity';
+import { Wallet } from '../../wallet/entity/wallet.entity';
 
-// TODO: Add @Index decorator for frequently queried fields
-// TODO: Consider adding soft delete with @DeleteDateColumn for data recovery
-// TODO: Add profile picture/avatar field
+export enum UserRole {
+  USER = 'user',
+  SUPER_ADMIN = 'super_admin',
+  ADMIN = 'admin',
+  MODERATOR = 'moderator',
+}
 
 @Entity('users')
 export class User {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  // TODO: Add @Index() decorator for faster email lookups during login
-  @Index()
   @Column({ unique: true })
   email: string;
 
-  @Column()
   @Exclude()
+  @Column()
   password: string;
 
   @Column()
@@ -38,29 +38,48 @@ export class User {
   @Column()
   lastName: string;
 
-  @Column({ nullable: true })
-  phoneNumber: string;
+  @Column({
+    type: 'enum',
+    enum: UserRole,
+    default: UserRole.USER,
+  })
+  role: UserRole;
 
   @Column({ default: false })
   isEmailVerified: boolean;
 
-  @Column({ nullable: true })
   @Exclude()
+  @Column({ nullable: true })
   emailVerificationToken: string;
 
-  @Column({ nullable: true })
   @Exclude()
+  @Column({ nullable: true })
   resetPasswordToken: string;
 
-  @Column({ nullable: true })
   @Exclude()
+  @Column({ type: 'timestamp', nullable: true })
   resetPasswordExpires: Date;
 
-  @OneToOne(() => Wallet, wallet => wallet.user)
-  wallet: Wallet;
+  
+  @Column({ default: false })
+  isTwoFactorEnabled: boolean;
+
+
+  @Column({ type: 'json', nullable: true })
+  twoFactorSecret: string | null;
+
+
+  @Column({ default: true })
+  isActive: boolean;
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
 
   @OneToMany(() => Cart, cart => cart.user)
-  cartItems: Cart[];
+  cart: Cart[];
 
   @OneToMany(() => Order, order => order.user)
   orders: Order[];
@@ -68,9 +87,26 @@ export class User {
   @OneToMany(() => Review, review => review.user)
   reviews: Review[];
 
-  @CreateDateColumn()
-  createdAt: Date;
+  @OneToOne(() => Wallet, wallet => wallet.user)
+  wallet: Wallet;
 
-  @UpdateDateColumn()
-  updatedAt: Date;
+
+  @Column({ type: 'text', nullable: true })
+  avatarUrl?: string;
+
+   @Column({ nullable: true })
+  cloudinaryPublicId: string;
+
+  
+  isAdmin(): boolean {
+    return [
+      UserRole.SUPER_ADMIN, 
+      UserRole.ADMIN, 
+      UserRole.MODERATOR
+    ].includes(this.role);
+  }
+
+  isSuperAdmin(): boolean {
+    return this.role === UserRole.SUPER_ADMIN;
+  }
 }
