@@ -61,7 +61,7 @@ import * as Joi from 'joi';
         database: configService.get<string>('DB_NAME'),
         entities: [__dirname + '/**/*.entity{.ts,.js}'],
         synchronize: false, 
-        migrationsRun: true, 
+        migrationsRun: false, 
         migrations: [__dirname + '/migrations/**/*{.ts,.js}'], 
         migrationsTableName: 'migrations', 
         

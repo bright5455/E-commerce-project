@@ -11,6 +11,7 @@ export default new DataSource({
   username: process.env.DB_USERNAME || 'postgres',
   password: process.env.DB_PASSWORD || 'your_password',
   database: process.env.DB_DATABASE || 'ecommerce',
+  schema: 'public',
   entities: ['src/**/*.entity.ts'],
   migrations: ['src/migrations/*.ts'],
   synchronize: false,
