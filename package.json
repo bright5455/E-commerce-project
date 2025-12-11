@@ -13,7 +13,7 @@
     "migration:revert": "typeorm-ts-node-commonjs migration:revert -d typeorm.config.ts",
     "migration:show": "typeorm-ts-node-commonjs migration:show -d typeorm.config.ts",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "start": "nest start",
+    "start": "node --max-old-space-size=2048 node_modules/.bin/nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
