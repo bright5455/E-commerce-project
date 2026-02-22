@@ -55,6 +55,7 @@ jobs:
           SSH_OPTS="-i ~/.ssh/deploy_key -o StrictHostKeyChecking=no"
           TARGET="${EC2_USER:-ec2-user}@${EC2_HOST}"
           ssh $SSH_OPTS ${TARGET} 'mkdir -p ~/apps/dist'
+          test -f dist/main.js || (echo "::error::Build did not produce dist/main.js" && ls -la dist/ && exit 1)
           # Write deployment manifest (commit + time) so you can verify what is running on EC2
           echo "COMMIT_SHA=${{ github.sha }}" > DEPLOYED.txt
           echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> DEPLOYED.txt
@@ -76,11 +77,23 @@ jobs:
             set -e
             cd ~/apps
             npm ci --omit=dev
+            # Use absolute path so PM2 finds the script regardless of cwd
+            MAIN_SCRIPT="$HOME/apps/dist/main.js"
+            if [ ! -f "$MAIN_SCRIPT" ]; then
+              echo "::error::Deployed script not found at $MAIN_SCRIPT"
+              echo "Contents of ~/apps:"
+              ls -la ~/apps || true
+              echo "Contents of ~/apps/dist:"
+              ls -la ~/apps/dist 2>/dev/null || true
+              exit 1
+            fi
             if command -v pm2 >/dev/null 2>&1; then
-              pm2 restart all || (pm2 start dist/main.js --name ecommerce && pm2 save)
+              pm2 delete ecommerce 2>/dev/null || true
+              pm2 start "$MAIN_SCRIPT" --name ecommerce
+              pm2 save
             else
               (pkill -f "node dist/main" || true)
-              nohup node dist/main.js > app.log 2>&1 &
+              nohup node "$MAIN_SCRIPT" > app.log 2>&1 &
             fi
           REMOTE
           # Log deployed version and app process on EC2
