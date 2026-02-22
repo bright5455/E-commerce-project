@@ -5,7 +5,7 @@
 #   PROD_ENV            - Contents of your .env file for production (DB_*, JWT_SECRET, MAIL_*, etc.)
 # Optional:
 #   EC2_USER           - SSH user (default: ec2-user)
-# On the EC2 instance: create ~/app, ensure Node.js 20+ and optionally PM2 are installed.
+# On the EC2 instance: create ~/apps, ensure Node.js 20+ and optionally PM2 are installed.
 name: Deploy prod to AWS EC2
 
 on:
@@ -54,28 +54,47 @@ jobs:
         run: |
           SSH_OPTS="-i ~/.ssh/deploy_key -o StrictHostKeyChecking=no"
           TARGET="${EC2_USER:-ec2-user}@${EC2_HOST}"
-          ssh $SSH_OPTS ${TARGET} 'mkdir -p ~/app/dist'
-          # Sync built output and package files
-          rsync -avz --delete -e "ssh $SSH_OPTS" dist/ ${TARGET}:~/app/dist/
-          rsync -avz -e "ssh $SSH_OPTS" package.json package-lock.json ${TARGET}:~/app/
+          ssh $SSH_OPTS ${TARGET} 'mkdir -p ~/apps/dist'
+          # Write deployment manifest (commit + time) so you can verify what is running on EC2
+          echo "COMMIT_SHA=${{ github.sha }}" > DEPLOYED.txt
+          echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> DEPLOYED.txt
+          echo "BRANCH=${{ github.ref_name }}" >> DEPLOYED.txt
+          echo "DEPLOYED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> DEPLOYED.txt
+          # Sync built output, package files, and deployment manifest
+          rsync -avz --delete -e "ssh $SSH_OPTS" dist/ ${TARGET}:~/apps/dist/
+          rsync -avz -e "ssh $SSH_OPTS" package.json package-lock.json DEPLOYED.txt ${TARGET}:~/apps/
           # Write .env on server from secret (so app can connect to DB, etc.)
           if [ -z "$PROD_ENV" ]; then
             echo "::warning::PROD_ENV secret is not set — app may fail to connect to DB. Add repo secret PROD_ENV with your .env contents."
           else
             printf '%s' "$PROD_ENV" > .env.deploy
-            scp $SSH_OPTS .env.deploy ${TARGET}:~/app/.env
+            scp $SSH_OPTS .env.deploy ${TARGET}:~/apps/.env
             rm -f .env.deploy
           fi
           # Install prod deps and restart on EC2
           ssh $SSH_OPTS ${TARGET} 'bash -s' << 'REMOTE'
             set -e
-            cd ~/app
+            cd ~/apps
             npm ci --omit=dev
             if command -v pm2 >/dev/null 2>&1; then
               pm2 restart all || (pm2 start dist/main.js --name ecommerce && pm2 save)
             else
               (pkill -f "node dist/main" || true)
               nohup node dist/main.js > app.log 2>&1 &
+            fi
+          REMOTE
+          # Log deployed version and app process on EC2
+          echo "Deployed to EC2 (verify with: cat ~/apps/DEPLOYED.txt on the server):"
+          cat DEPLOYED.txt
+          echo ""
+          echo "App process on EC2:"
+          ssh $SSH_OPTS ${TARGET} 'bash -s' << 'REMOTE'
+            if command -v pm2 >/dev/null 2>&1; then
+              pm2 list
+              pm2 jlist 2>/dev/null | grep -E '"pid"|"name"' || true
+            else
+              echo "PID(s) for node dist/main:"
+              pgrep -af "node dist/main" || echo "(none found)"
             fi
           REMOTE
 

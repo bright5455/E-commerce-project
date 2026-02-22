@@ -28,6 +28,7 @@ import * as Joi from 'joi';
         DB_USERNAME: Joi.string().required(),
         DB_PASSWORD: Joi.string().allow('').default(''),
         DB_NAME: Joi.string().required(),
+        DB_SSL: Joi.string().valid('true', 'false', '1', '0').optional(),
 
         JWT_SECRET: Joi.string().required(),
 
@@ -52,24 +53,34 @@ import * as Joi from 'joi';
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        type: 'postgres',
-        host: configService.get<string>('DB_HOST'),
-        port: configService.get<number>('DB_PORT'),
-        username: configService.get<string>('DB_USERNAME'),
-        password: configService.get<string>('DB_PASSWORD'),
-        database: configService.get<string>('DB_NAME'),
-        entities: [__dirname + '/**/*.entity{.ts,.js}'],
-        synchronize: false, 
-        migrationsRun: false, 
-        migrations: [__dirname + '/migrations/**/*{.ts,.js}'], 
-        migrationsTableName: 'migrations',
-        ssl: {
-          rejectUnauthorized: false, // Render uses self-signed certificates
-        },
-        
-        logging: configService.get<string>('NODE_ENV') === 'development',
-      }),
+      useFactory: (configService: ConfigService) => {
+        const nodeEnv = configService.get<string>('NODE_ENV');
+        const dbSsl = configService.get<string>('DB_SSL');
+        // AWS RDS and most managed Postgres require SSL. Enable in production or when DB_SSL=true.
+        const useSsl =
+          dbSsl === 'true' || dbSsl === '1' || nodeEnv === 'production';
+        const sslOptions = useSsl ? { rejectUnauthorized: false } : false;
+
+        return {
+          type: 'postgres',
+          host: configService.get<string>('DB_HOST'),
+          port: configService.get<number>('DB_PORT'),
+          username: configService.get<string>('DB_USERNAME'),
+          password: configService.get<string>('DB_PASSWORD'),
+          database: configService.get<string>('DB_NAME'),
+          entities: [__dirname + '/**/*.entity{.ts,.js}'],
+          synchronize: false,
+          migrationsRun: false,
+          migrations: [__dirname + '/migrations/**/*{.ts,.js}'],
+          migrationsTableName: 'migrations',
+          ssl: sslOptions,
+          // Pass SSL through to pg driver (required for AWS RDS)
+          ...(useSsl && {
+            extra: { ssl: { rejectUnauthorized: false } },
+          }),
+          logging: nodeEnv === 'development',
+        };
+      },
     }),
 
     PassportModule,
