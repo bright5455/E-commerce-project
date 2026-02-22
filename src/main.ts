@@ -6,8 +6,12 @@ import helmet from 'helmet';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  
-  app.use(helmet());
+
+  // Apply Helmet to all routes except Swagger UI so CSP doesn't block swagger-ui assets
+  app.use((req, res, next) => {
+    if (req.url?.startsWith('/api/docs')) return next();
+    return helmet()(req, res, next);
+  });
 
   app.useGlobalPipes(
     new ValidationPipe({
