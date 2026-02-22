@@ -55,7 +55,7 @@ jobs:
           SSH_OPTS="-i ~/.ssh/deploy_key -o StrictHostKeyChecking=no"
           TARGET="${EC2_USER:-ec2-user}@${EC2_HOST}"
           ssh $SSH_OPTS ${TARGET} 'mkdir -p ~/apps/dist'
-          test -f dist/main.js || (echo "::error::Build did not produce dist/main.js" && ls -la dist/ && exit 1)
+          test -f dist/src/main.js || test -f dist/main.js || (echo "::error::Build did not produce dist/main.js or dist/src/main.js" && ls -la dist/ && exit 1)
           # Write deployment manifest (commit + time) so you can verify what is running on EC2
           echo "COMMIT_SHA=${{ github.sha }}" > DEPLOYED.txt
           echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> DEPLOYED.txt
@@ -77,8 +77,12 @@ jobs:
             set -e
             cd ~/apps
             npm ci --omit=dev
-            # Use absolute path so PM2 finds the script regardless of cwd
-            MAIN_SCRIPT="$HOME/apps/dist/main.js"
+            # Use absolute path so PM2 finds the script regardless of cwd (NestJS may output dist/src/main.js)
+            if [ -f "$HOME/apps/dist/src/main.js" ]; then
+              MAIN_SCRIPT="$HOME/apps/dist/src/main.js"
+            else
+              MAIN_SCRIPT="$HOME/apps/dist/main.js"
+            fi
             if [ ! -f "$MAIN_SCRIPT" ]; then
               echo "::error::Deployed script not found at $MAIN_SCRIPT"
               echo "Contents of ~/apps:"
