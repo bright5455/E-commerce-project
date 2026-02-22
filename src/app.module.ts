@@ -63,7 +63,10 @@ import * as Joi from 'joi';
         synchronize: false, 
         migrationsRun: false, 
         migrations: [__dirname + '/migrations/**/*{.ts,.js}'], 
-        migrationsTableName: 'migrations', 
+        migrationsTableName: 'migrations',
+        ssl: {
+          rejectUnauthorized: false, // Render uses self-signed certificates
+        },
         
         logging: configService.get<string>('NODE_ENV') === 'development',
       }),
