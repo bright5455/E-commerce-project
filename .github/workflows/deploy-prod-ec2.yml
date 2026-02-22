@@ -1,0 +1,76 @@
+# Deploys the NestJS app to AWS EC2 on every push to the prod branch.
+# Required GitHub secrets:
+#   EC2_HOST           - EC2 instance hostname or IP (e.g. ec2-xx-xx-xx-xx.compute.amazonaws.com)
+#   EC2_SSH_PRIVATE_KEY - PEM content of the SSH key used to connect to the instance
+#   PROD_ENV            - Contents of your .env file for production (DB_*, JWT_SECRET, MAIL_*, etc.)
+# Optional:
+#   EC2_USER           - SSH user (default: ec2-user)
+# On the EC2 instance: create ~/app, ensure Node.js 20+ and optionally PM2 are installed.
+name: Deploy prod to AWS EC2
+
+on:
+  push:
+    branches:
+      - prod
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Deploy to EC2
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ${{ secrets.EC2_USER }}
+          PROD_ENV: ${{ secrets.PROD_ENV }}
+        run: |
+          SSH_OPTS="-i ~/.ssh/deploy_key -o StrictHostKeyChecking=no"
+          TARGET="${EC2_USER:-ec2-user}@${EC2_HOST}"
+          # Sync built output and package files
+          rsync -avz --delete -e "ssh $SSH_OPTS" dist/ ${TARGET}:~/app/dist/
+          rsync -avz -e "ssh $SSH_OPTS" package.json package-lock.json ${TARGET}:~/app/
+          # Write .env on server from secret (so app can connect to DB, etc.)
+          if [ -z "$PROD_ENV" ]; then
+            echo "::warning::PROD_ENV secret is not set — app may fail to connect to DB. Add repo secret PROD_ENV with your .env contents."
+          else
+            printf '%s' "$PROD_ENV" > .env.deploy
+            scp $SSH_OPTS .env.deploy ${TARGET}:~/app/.env
+            rm -f .env.deploy
+          fi
+          # Install prod deps and restart on EC2
+          ssh $SSH_OPTS ${TARGET} 'bash -s' << 'REMOTE'
+            set -e
+            cd ~/app
+            npm ci --omit=dev
+            if command -v pm2 >/dev/null 2>&1; then
+              pm2 restart all || (pm2 start dist/main.js --name ecommerce && pm2 save)
+            else
+              (pkill -f "node dist/main" || true)
+              nohup node dist/main.js > app.log 2>&1 &
+            fi
+          REMOTE
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
