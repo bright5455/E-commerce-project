@@ -40,9 +40,12 @@ async function bootstrap() {
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-
-
-  if (process.env.NODE_ENV !== 'production') {
+  // Enable Swagger when not in production, or when ENABLE_SWAGGER=true (e.g. on EC2 for viewing docs)
+  const enableSwagger =
+    process.env.NODE_ENV !== 'production' ||
+    process.env.ENABLE_SWAGGER === 'true' ||
+    process.env.ENABLE_SWAGGER === '1';
+  if (enableSwagger) {
     SwaggerModule.setup('api/docs', app, document);
   }
 
