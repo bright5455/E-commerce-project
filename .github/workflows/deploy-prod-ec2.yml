@@ -33,9 +33,16 @@ jobs:
         run: npm run build
 
       - name: Configure SSH
+        env:
+          SSH_KEY_RAW: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          SSH_KEY_B64: ${{ secrets.EC2_SSH_PRIVATE_KEY_BASE64 }}
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          if [ -n "$SSH_KEY_B64" ]; then
+            echo "$SSH_KEY_B64" | base64 -d > ~/.ssh/deploy_key
+          else
+            printf '%s' "$SSH_KEY_RAW" | sed 's/\r$//' > ~/.ssh/deploy_key
+          fi
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
@@ -47,6 +54,7 @@ jobs:
         run: |
           SSH_OPTS="-i ~/.ssh/deploy_key -o StrictHostKeyChecking=no"
           TARGET="${EC2_USER:-ec2-user}@${EC2_HOST}"
+          ssh $SSH_OPTS ${TARGET} 'mkdir -p ~/app/dist'
           # Sync built output and package files
           rsync -avz --delete -e "ssh $SSH_OPTS" dist/ ${TARGET}:~/app/dist/
           rsync -avz -e "ssh $SSH_OPTS" package.json package-lock.json ${TARGET}:~/app/
