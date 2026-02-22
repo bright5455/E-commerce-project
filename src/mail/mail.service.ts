@@ -38,23 +38,29 @@ export class MailService {
   
 
   private initializeTransporter() {
-    const isProduction = this.configService.get<string>('NODE_ENV') === 'production';
+    const port = this.configService.get<number>('MAIL_PORT') ?? 587;
+    // Port 465 = implicit SSL (secure: true). Port 587/25 = STARTTLS (secure: false).
+    const secureFromPort = port === 465;
+    const mailSecure = this.configService.get<string>('MAIL_SECURE');
+    const secure =
+      mailSecure === 'true' || mailSecure === '1'
+        ? true
+        : mailSecure === 'false' || mailSecure === '0'
+          ? false
+          : secureFromPort;
 
     this.transporter = nodemailer.createTransport({
       host: this.configService.get<string>('MAIL_HOST'),
-      port: this.configService.get<number>('MAIL_PORT'),
-      secure: isProduction,
+      port,
+      secure,
       auth: {
         user: this.configService.get<string>('MAIL_USER'),
         pass: this.configService.get<string>('MAIL_PASS'),
       },
-      
-      ...(isProduction && {
-        tls: {
-          rejectUnauthorized: true,
-          minVersion: 'TLSv1.2',
-        },
-      }),
+      tls: {
+        rejectUnauthorized: false,
+        minVersion: 'TLSv1.2',
+      },
     });
 
     

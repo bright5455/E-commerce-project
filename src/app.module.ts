@@ -37,6 +37,7 @@ import * as Joi from 'joi';
         MAIL_USER: Joi.string().required(),
         MAIL_PASS: Joi.string().required(),
         MAIL_FROM: Joi.string().required(),
+        MAIL_SECURE: Joi.string().valid('true', 'false', '1', '0').optional(),
 
         FRONTEND_URL: Joi.string().uri().default('http://localhost:3000'),
 
@@ -59,26 +60,42 @@ import * as Joi from 'joi';
         // AWS RDS and most managed Postgres require SSL. Enable in production or when DB_SSL=true.
         const useSsl =
           dbSsl === 'true' || dbSsl === '1' || nodeEnv === 'production';
-        const sslOptions = useSsl ? { rejectUnauthorized: false } : false;
 
-        return {
-          type: 'postgres',
-          host: configService.get<string>('DB_HOST'),
-          port: configService.get<number>('DB_PORT'),
-          username: configService.get<string>('DB_USERNAME'),
-          password: configService.get<string>('DB_PASSWORD'),
-          database: configService.get<string>('DB_NAME'),
+        const host = configService.get<string>('DB_HOST');
+        const port = configService.get<number>('DB_PORT');
+        const username = configService.get<string>('DB_USERNAME');
+        const password = configService.get<string>('DB_PASSWORD');
+        const database = configService.get<string>('DB_NAME');
+
+        // Use connection URL with sslmode=require so pg driver always uses SSL when required
+        const base = {
+          type: 'postgres' as const,
           entities: [__dirname + '/**/*.entity{.ts,.js}'],
           synchronize: false,
           migrationsRun: false,
           migrations: [__dirname + '/migrations/**/*{.ts,.js}'],
           migrationsTableName: 'migrations',
-          ssl: sslOptions,
-          // Pass SSL through to pg driver (required for AWS RDS)
-          ...(useSsl && {
-            extra: { ssl: { rejectUnauthorized: false } },
-          }),
           logging: nodeEnv === 'development',
+        };
+
+        if (useSsl) {
+          const escapedPassword = encodeURIComponent(password || '');
+          return {
+            ...base,
+            url: `postgresql://${username}:${escapedPassword}@${host}:${port}/${database}?sslmode=require`,
+            ssl: { rejectUnauthorized: false },
+            extra: { ssl: { rejectUnauthorized: false } },
+          };
+        }
+
+        return {
+          ...base,
+          host,
+          port,
+          username,
+          password,
+          database,
+          ssl: false,
         };
       },
     }),
