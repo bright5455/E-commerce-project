@@ -10,7 +10,7 @@ export default new DataSource({
   port: parseInt(process.env.DB_PORT || '5432'),
   username: process.env.DB_USERNAME || 'postgres',
   password: process.env.DB_PASSWORD || 'your_password',
-  database: process.env.DB_DATABASE || 'ecommerce',
+  database: process.env.DB_NAME || 'ecommerce',
   schema: 'public',
   entities: ['src/**/*.entity.ts'],
   migrations: ['src/migrations/*.ts'],

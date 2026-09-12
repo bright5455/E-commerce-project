@@ -6,7 +6,9 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['eslint.config.mjs'],
+    // frontend/ is a separate Next.js app with its own eslint.config.mjs and
+    // tsconfig.json; it is not part of this NestJS project.
+    ignores: ['eslint.config.mjs', 'frontend/**'],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,

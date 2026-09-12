@@ -11,6 +11,13 @@ import { Order, OrderStatus, PaymentMethod } from './entity/order.entity';
 import { OrderItem } from './entity/order-item.entity';
 import { User } from '../user/entity/user.entity';
 import { Wallet } from '../wallet/entity/wallet.entity';
+import { Cart } from '../cart/entity/cart.entity';
+import { Product } from '../product/entity/product.entity';
+import {
+  Transaction,
+  TransactionType,
+  TransactionStatus,
+} from '../transaction/entity/transaction.entity';
 import {
   CreateOrderDto,
   CheckoutDto,
@@ -32,6 +39,10 @@ export class OrderService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(Wallet)
     private readonly walletRepository: Repository<Wallet>,
+    @InjectRepository(Cart)
+    private readonly cartRepository: Repository<Cart>,
+    @InjectRepository(Product)
+    private readonly productRepository: Repository<Product>,
     private readonly dataSource: DataSource,
   ) {}
 
@@ -58,6 +69,16 @@ export class OrderService {
   }
 
 
+  private round(value: number): number {
+    return Math.round(value * 100) / 100;
+  }
+
+  private calculateTotals(subtotal: number) {
+    const tax = this.round(subtotal * 0.1);
+    const shippingFee = subtotal > 500 ? 0 : 50;
+    return { tax, shippingFee, total: this.round(subtotal + tax + shippingFee) };
+  }
+
   async create(userId: string, createOrderDto: CreateOrderDto) {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -69,30 +90,47 @@ export class OrderService {
         throw new NotFoundException('User not found');
       }
 
+      if (!createOrderDto.items?.length) {
+        throw new BadRequestException('Order must contain at least one item');
+      }
+
       let subtotal = 0;
       const orderItems: Partial<OrderItem>[] = [];
 
       for (const item of createOrderDto.items) {
-        const productPrice = 100; 
-        const productName = 'Product Name'; 
-        const productImage = 'image.jpg'; 
+        const product = await queryRunner.manager.findOne(Product, {
+          where: { id: item.productId },
+        });
 
-        const itemTotal = productPrice * item.quantity;
-        subtotal += itemTotal;
+        if (!product) {
+          throw new NotFoundException(`Product ${item.productId} not found`);
+        }
+
+        if (!product.isActive) {
+          throw new BadRequestException(`${product.name} is no longer available`);
+        }
+
+        if (product.stock < item.quantity) {
+          throw new BadRequestException(
+            `Insufficient stock for ${product.name}. Available: ${product.stock}, requested: ${item.quantity}`,
+          );
+        }
+
+        const price = Number(product.price);
+        const itemTotal = this.round(price * item.quantity);
+        subtotal = this.round(subtotal + itemTotal);
 
         orderItems.push({
-          productId: item.productId,
-          productName,
-          productImage,
-          price: productPrice,
+          productId: product.id,
+          productName: product.name,
+          productImage: product.imageUrl,
+          price,
           quantity: item.quantity,
           total: itemTotal,
         });
       }
 
-      const tax = subtotal * 0.1; 
-      const shippingFee = subtotal > 500 ? 0 : 50; 
-      const total = subtotal + tax + shippingFee;
+      const { tax, shippingFee, total } = this.calculateTotals(subtotal);
 
       const order = this.orderRepository.create({
         userId,
@@ -101,7 +139,7 @@ export class OrderService {
         shippingFee,
         total,
         status: OrderStatus.PENDING,
-        paymentMethod: createOrderDto.paymentMethod ?? PaymentMethod.WALLET, 
+        paymentMethod: createOrderDto.paymentMethod ?? PaymentMethod.WALLET,
         shippingAddress: createOrderDto.shippingAddress,
         shippingCity: createOrderDto.shippingCity,
         shippingState: createOrderDto.shippingState,
@@ -114,11 +152,10 @@ export class OrderService {
       const savedOrder = await queryRunner.manager.save(Order, order);
 
       for (const item of orderItems) {
-        const orderItem = this.orderItemRepository.create({
-          ...item,
-          orderId: savedOrder.id,
-        });
-        await queryRunner.manager.save(orderItem);
+        await queryRunner.manager.save(
+          OrderItem,
+          this.orderItemRepository.create({ ...item, orderId: savedOrder.id }),
+        );
       }
 
       await queryRunner.commitTransaction();
@@ -141,31 +178,48 @@ export class OrderService {
     await queryRunner.startTransaction();
 
     try {
-      const cartItems = [
-        { productId: 'product-1', quantity: 2, price: 100 },
-        { productId: 'product-2', quantity: 1, price: 200 },
-      ];
+      const cartItems = await queryRunner.manager.find(Cart, {
+        where: { userId },
+        relations: ['product'],
+      });
 
       if (cartItems.length === 0) {
         throw new BadRequestException('Cart is empty');
       }
 
+      let subtotal = 0;
+      const orderItems: Partial<OrderItem>[] = [];
+
       for (const item of cartItems) {
-        const availableStock = 10; 
-        if (item.quantity > availableStock) {
+        const product = item.product;
+
+        if (!product || !product.isActive) {
           throw new BadRequestException(
-            `Insufficient stock for product ${item.productId}`,
+            `${product?.name ?? 'A product in your cart'} is no longer available`,
           );
         }
+
+        if (product.stock < item.quantity) {
+          throw new BadRequestException(
+            `Insufficient stock for ${product.name}. Available: ${product.stock}, requested: ${item.quantity}`,
+          );
+        }
+
+        const price = Number(product.price);
+        const itemTotal = this.round(price * item.quantity);
+        subtotal = this.round(subtotal + itemTotal);
+
+        orderItems.push({
+          productId: product.id,
+          productName: product.name,
+          productImage: product.imageUrl,
+          price,
+          quantity: item.quantity,
+          total: itemTotal,
+        });
       }
 
-      const subtotal = cartItems.reduce(
-        (sum, item) => sum + item.price * item.quantity,
-        0,
-      );
-      const tax = subtotal * 0.1;
-      const shippingFee = subtotal > 500 ? 0 : 50;
-      const total = subtotal + tax + shippingFee;
+      const { tax, shippingFee, total } = this.calculateTotals(subtotal);
 
       const wallet = await queryRunner.manager.findOne(Wallet, {
         where: { userId },
@@ -175,14 +229,17 @@ export class OrderService {
         throw new NotFoundException('Wallet not found');
       }
 
-      if (wallet.balance < total) {
+      const balanceBefore = Number(wallet.balance);
+
+      if (balanceBefore < total) {
         throw new BadRequestException(
-          `Insufficient wallet balance. Required: $${total}, Available: $${wallet.balance}`,
+          `Insufficient wallet balance. Required: ${total.toFixed(2)}, available: ${balanceBefore.toFixed(2)}`,
         );
       }
 
-      wallet.balance = Number(wallet.balance) - total;
-      await queryRunner.manager.save(wallet);
+      const balanceAfter = this.round(balanceBefore - total);
+      wallet.balance = balanceAfter;
+      await queryRunner.manager.save(Wallet, wallet);
 
       const order = this.orderRepository.create({
         userId,
@@ -203,20 +260,41 @@ export class OrderService {
         notes: checkoutDto.notes,
       });
 
-      const savedOrder = await queryRunner.manager.save(order);
+      const savedOrder = await queryRunner.manager.save(Order, order);
+
+      for (const item of orderItems) {
+        await queryRunner.manager.save(
+          OrderItem,
+          this.orderItemRepository.create({ ...item, orderId: savedOrder.id }),
+        );
+      }
 
       for (const item of cartItems) {
-        const orderItem = this.orderItemRepository.create({
-          orderId: savedOrder.id,
-          productId: item.productId,
-          productName: 'Product Name', 
-          productImage: 'image.jpg', 
-          price: item.price,
-          quantity: item.quantity,
-          total: item.price * item.quantity,
-        });
-        await queryRunner.manager.save(orderItem);
+        await queryRunner.manager.decrement(
+          Product,
+          { id: item.productId },
+          'stock',
+          item.quantity,
+        );
       }
+
+      await queryRunner.manager.save(
+        Transaction,
+        queryRunner.manager.create(Transaction, {
+          walletId: wallet.id,
+          userId,
+          type: TransactionType.PAYMENT,
+          amount: total,
+          balanceBefore,
+          balanceAfter,
+          status: TransactionStatus.COMPLETED,
+          description: `Payment for order ${savedOrder.id}`,
+          referenceId: savedOrder.id,
+          referenceType: 'order',
+        }),
+      );
+
+      await queryRunner.manager.delete(Cart, { userId });
 
       await queryRunner.commitTransaction();
 

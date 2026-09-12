@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -46,13 +47,22 @@ export class TransactionService {
     return transaction;
   }
 
-  async findAllByWallet(walletId: string, query: TransactionQueryDto) {
+  async findAllByWallet(
+    walletId: string,
+    query: TransactionQueryDto,
+    requestingUserId: string,
+    isAdmin: boolean,
+  ) {
     const wallet = await this.walletRepository.findOne({
       where: { id: walletId },
     });
 
     if (!wallet) {
       throw new NotFoundException(`Wallet with ID ${walletId} not found`);
+    }
+
+    if (!isAdmin && wallet.userId !== requestingUserId) {
+      throw new ForbiddenException('You can only view your own wallet transactions');
     }
 
     const { page = 1, limit = 10, type, status, startDate, endDate, search, sortBy, sortOrder, minAmount, maxAmount } = query;

@@ -7,6 +7,7 @@ import {
   Query,
   UseGuards,
   Req,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -61,19 +62,29 @@ export class TransactionController {
     @Param('walletId') walletId: string,
     @Query() query: TransactionQueryDto,
     @User('id') userId: string,
+    @User('role') role: UserRole,
   ) {
-    return this.transactionService.findAllByWallet(walletId, query);
+    const isAdmin = role === UserRole.SUPER_ADMIN || role === UserRole.ADMIN;
+    return this.transactionService.findAllByWallet(walletId, query, userId, isAdmin);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get transaction details by ID' })
   @ApiResponse({ status: 200, description: 'Transaction details retrieved' })
-  async findOne(@Param('id') id: string, @User('id') userId: string) {
+  async findOne(
+    @Param('id') id: string,
+    @User('id') userId: string,
+    @User('role') role: UserRole,
+  ) {
     const transaction = await this.transactionService.findOne(id);
-    
-    if (transaction.userId !== userId) {
+
+    const isOwner = transaction.userId === userId;
+    const isAdmin = role === UserRole.SUPER_ADMIN || role === UserRole.ADMIN;
+
+    if (!isOwner && !isAdmin) {
+      throw new ForbiddenException('You can only view your own transactions');
     }
-    
+
     return transaction;
   }
 
