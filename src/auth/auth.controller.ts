@@ -191,8 +191,23 @@ export class AuthController {
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get current user profile' })
   async getProfile(@Req() req: RequestWithUser) {
+    // req.user is populated by JwtStrategy.validate, which spreads the full
+    // User entity into a plain object - that loses the class-transformer
+    // metadata @Exclude() relies on, so sensitive fields must be stripped
+    // explicitly here rather than returned as-is. Prefer GET /profile
+    // (ProfileController), which does this safely via the entity + interceptor;
+    // this route is kept only for backwards compatibility.
+    const {
+      password,
+      twoFactorSecret,
+      emailVerificationToken,
+      resetPasswordToken,
+      resetPasswordExpires,
+      ...safeUser
+    } = req.user as unknown as Record<string, unknown>;
+
     return {
-      user: req.user,
+      user: safeUser,
     };
   }
 

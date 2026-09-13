@@ -7,6 +7,7 @@ import {
   Param,
   Query,
   UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -63,12 +64,20 @@ export class OrderController {
   @Get(':id')
   @ApiOperation({ summary: 'Get order details by ID' })
   @ApiResponse({ status: 200, description: 'Order details retrieved' })
-  async findOne(@Param('id') id: string, @User('id') userId: string) {
+  async findOne(
+    @Param('id') id: string,
+    @User('id') userId: string,
+    @User('role') role: UserRole,
+  ) {
     const order = await this.orderService.findOne(id);
-    
-    if (order.userId !== userId) {
+
+    const isOwner = order.userId === userId;
+    const isAdmin = role === UserRole.SUPER_ADMIN || role === UserRole.ADMIN;
+
+    if (!isOwner && !isAdmin) {
+      throw new ForbiddenException('You can only view your own orders');
     }
-    
+
     return order;
   }
 
