@@ -30,6 +30,12 @@ export async function getAllUsers(query: UserQuery = {}) {
   return data;
 }
 
+/** GET /users/:id - admin/super_admin only. */
+export async function getUser(id: string) {
+  const { data } = await api.get<Profile>(`/users/${id}`);
+  return data;
+}
+
 /** PATCH /users/:id/deactivate - admin/super_admin only. */
 export async function deactivateUser(id: string) {
   const { data } = await api.patch<Profile>(`/users/${id}/deactivate`);

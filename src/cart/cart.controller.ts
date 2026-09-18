@@ -13,6 +13,9 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagg
 import { CartService } from './cart.service';
 import { AddToCartDto } from './dto/cart.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/role.decorator';
+import { UserRole } from '../user/entity/user.entity';
 
 @ApiTags('cart')
 @Controller('cart')
@@ -26,6 +29,15 @@ export class CartController {
   @ApiResponse({ status: 200, description: 'Cart retrieved successfully' })
   async getCart(@Request() req) {
     return this.cartService.getCart(req.user.id);
+  }
+
+  @Get('admin/:userId')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @ApiOperation({ summary: "Get a specific user's cart (Admin only)" })
+  @ApiResponse({ status: 200, description: 'Cart retrieved successfully' })
+  async getUserCart(@Param('userId') userId: string) {
+    return this.cartService.getCart(userId);
   }
 
   @Get('total')

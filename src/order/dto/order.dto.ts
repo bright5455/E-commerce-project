@@ -130,6 +130,12 @@ export class OrderQueryDto {
   @IsEnum(OrderStatus)
   status?: OrderStatus;
 
+  // Only honored on the admin findAll() - filters to one customer's orders,
+  // e.g. from the admin user-detail page.
+  @IsOptional()
+  @IsString()
+  userId?: string;
+
   @IsOptional()
   @IsString()
   search?: string;

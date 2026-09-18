@@ -49,3 +49,9 @@ export async function validateCart() {
   const { data } = await api.post<CartValidationResponse>('/cart/validate');
   return data;
 }
+
+/** GET /cart/admin/:userId - admin/super_admin only. */
+export async function getUserCart(userId: string) {
+  const { data } = await api.get<CartResponse>(`/cart/admin/${userId}`);
+  return data;
+}

@@ -12,6 +12,8 @@ export interface OrderQuery {
   page?: number;
   limit?: number;
   status?: OrderStatus;
+  /** Admin findAll() only - scopes the listing to one customer. */
+  userId?: string;
 }
 
 /**

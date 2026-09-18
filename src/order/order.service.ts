@@ -639,7 +639,7 @@ export class OrderService {
   }
 
   async findAll(query: OrderQueryDto) {
-    const { page = 1, limit = 10, status, search, sortBy = 'createdAt', sortOrder = 'DESC' } = query;
+    const { page = 1, limit = 10, status, search, userId, sortBy = 'createdAt', sortOrder = 'DESC' } = query;
     const skip = (page - 1) * limit;
 
     const queryBuilder = this.orderRepository
@@ -649,6 +649,10 @@ export class OrderService {
 
     if (status) {
       queryBuilder.where('order.status = :status', { status });
+    }
+
+    if (userId) {
+      queryBuilder.andWhere('order.userId = :userId', { userId });
     }
 
     if (search) {

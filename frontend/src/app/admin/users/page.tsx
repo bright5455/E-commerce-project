@@ -76,7 +76,7 @@ function UserRow({
 
   return (
     <li className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-5 sm:flex-row sm:items-center sm:justify-between">
-      <div className="min-w-0">
+      <Link href={`/admin/users/${targetUser.id}`} className="min-w-0 hover:opacity-80">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium text-slate-900">
             {targetUser.firstName} {targetUser.lastName}
@@ -92,7 +92,7 @@ function UserRow({
         </div>
         <p className="mt-1 truncate text-sm text-slate-500">{targetUser.email}</p>
         <p className="mt-1 text-xs text-slate-400">Joined {formatDate(targetUser.createdAt)}</p>
-      </div>
+      </Link>
 
       {!isSelf && (
         <Button
