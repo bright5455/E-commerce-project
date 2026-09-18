@@ -8,7 +8,7 @@ import { memoryStorage } from 'multer';
 import { ProfileController } from './profile.controller';
 import { ProfileService } from './profile.service';
 import { User } from '../user/entity/user.entity';
-import { CloudinaryModule } from 'src/cloudinary/cloudinary.module';
+import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 
 @Module({
   imports: [

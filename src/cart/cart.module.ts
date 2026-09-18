@@ -3,8 +3,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { CartService } from './cart.service';
 import { CartController } from './cart.controller';
 import { Cart } from './entity/cart.entity';
-import { Product } from 'src/product/entity/product.entity';
-import { User } from 'src/user/entity/user.entity';
+import { Product } from '../product/entity/product.entity';
+import { User } from '../user/entity/user.entity';
 
 @Module({
   imports: [
