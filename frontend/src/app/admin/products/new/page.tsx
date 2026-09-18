@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Suspense } from 'react';
+import { Suspense, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '@/components/providers/AuthProvider';
 import { RequireAuth } from '@/components/providers/RequireAuth';
@@ -11,8 +11,9 @@ import { useToast } from '@/components/providers/ToastProvider';
 import { Button } from '@/components/ui/Button';
 import { InputField, TextareaField } from '@/components/ui/Field';
 import { FormError } from '@/components/ui/States';
-import { LoadingBlock } from '@/components/ui/Spinner';
-import { createProduct } from '@/lib/api/products';
+import { LoadingBlock, Spinner } from '@/components/ui/Spinner';
+import { ProductImage } from '@/components/products/ProductImage';
+import { createProduct, uploadProductImage } from '@/lib/api/products';
 import { toApiError } from '@/lib/errors';
 import { createProductSchema, type CreateProductFormValues } from '@/lib/validation';
 
@@ -40,16 +41,40 @@ function AdminOnly() {
 function AddProductForm() {
   const router = useRouter();
   const toast = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
     reset,
+    setValue,
+    watch,
     formState: { errors, isSubmitting, submitCount },
   } = useForm<CreateProductFormValues>({
     resolver: zodResolver(createProductSchema),
     defaultValues: { name: '', description: '', price: 0, stock: 0, imageUrl: '' },
   });
+
+  const imageUrl = watch('imageUrl');
+
+  async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = ''; // lets picking the same file twice re-trigger onChange
+    if (!file) return;
+
+    setImageError(null);
+    setIsUploading(true);
+    try {
+      const { imageUrl: uploaded } = await uploadProductImage(file);
+      setValue('imageUrl', uploaded, { shouldValidate: true });
+    } catch (error) {
+      setImageError(toApiError(error).message);
+    } finally {
+      setIsUploading(false);
+    }
+  }
 
   async function onSubmit(values: CreateProductFormValues) {
     try {
@@ -125,14 +150,66 @@ function AddProductForm() {
           />
         </div>
 
-        <InputField
-          label="Image URL"
-          optional
-          placeholder="https://images.unsplash.com/photo-..."
-          hint="Any direct image link works - shown as-is in the catalogue."
-          error={errors.imageUrl?.message}
-          {...register('imageUrl')}
-        />
+        <div className="space-y-1.5">
+          <label className="block text-sm font-medium text-slate-800">
+            Product photo
+            <span className="ml-1 font-normal text-slate-400">(optional)</span>
+          </label>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="sr-only"
+            onChange={handleFileChange}
+          />
+
+          <div className="flex items-center gap-4">
+            <div className="h-20 w-20 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-slate-50">
+              {isUploading ? (
+                <div className="flex h-full items-center justify-center">
+                  <Spinner className="h-5 w-5 text-slate-400" />
+                </div>
+              ) : (
+                <ProductImage
+                  src={imageUrl || null}
+                  alt="Selected product photo"
+                  className="h-full w-full object-cover"
+                />
+              )}
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={isUploading}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {isUploading
+                  ? 'Uploading...'
+                  : imageUrl
+                    ? 'Choose a different photo'
+                    : 'Choose from gallery'}
+              </Button>
+              {imageUrl && !isUploading && (
+                <button
+                  type="button"
+                  className="text-left text-xs font-medium text-slate-500 hover:text-slate-700"
+                  onClick={() => setValue('imageUrl', '', { shouldValidate: true })}
+                >
+                  Remove photo
+                </button>
+              )}
+            </div>
+          </div>
+
+          {imageError && <p className="text-xs font-medium text-red-600">{imageError}</p>}
+          {errors.imageUrl && (
+            <p className="text-xs font-medium text-red-600">{errors.imageUrl.message}</p>
+          )}
+        </div>
 
         <div className="flex items-center gap-3 pt-2">
           <Button type="submit" isLoading={isSubmitting}>

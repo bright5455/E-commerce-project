@@ -8,13 +8,22 @@ import {
   Param,
   Query,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  ParseFilePipe,
+  MaxFileSizeValidator,
+  FileTypeValidator,
 } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
   ApiBearerAuth,
   ApiResponse,
+  ApiConsumes,
+  ApiBody,
 } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import { Throttle } from '@nestjs/throttler';
 import { ProductService } from './product.service';
 import { CreateProductDto, UpdateProductDto } from './dto/product.dto';
@@ -81,6 +90,52 @@ export class ProductController {
   @ApiResponse({ status: 200, description: 'Low stock products retrieved' })
   async getLowStock(@Query('threshold') threshold?: number) {
     return this.productService.getLowStock(threshold);
+  }
+
+  @Post('upload-image')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 5 * 1024 * 1024 },
+    }),
+  )
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @ApiBearerAuth()
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Upload a product image, returns its URL (Admin only)' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'Product image (PNG, JPG, JPEG, WEBP - Max 5MB)',
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Image uploaded successfully' })
+  async uploadImage(
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }),
+          // skipMagicNumbersValidation: see the same fix in profile.controller.ts -
+          // the default magic-number check fails silently in Vercel's serverless bundle.
+          new FileTypeValidator({
+            fileType: /^image\/(png|jpe?g|webp)$/,
+            skipMagicNumbersValidation: true,
+          }),
+        ],
+        fileIsRequired: true,
+      }),
+    )
+    file: Express.Multer.File,
+  ) {
+    return this.productService.uploadProductImage(file);
   }
 
   @Post()

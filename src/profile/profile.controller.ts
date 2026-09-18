@@ -94,8 +94,15 @@ export class ProfileController {
     @UploadedFile(
       new ParseFilePipe({
         validators: [
-          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }), 
-          new FileTypeValidator({ fileType: /^image\/(png|jpe?g|webp)$/ }),
+          new MaxFileSizeValidator({ maxSize: 5 * 1024 * 1024 }),
+          // skipMagicNumbersValidation: the default magic-number check dynamically
+          // imports the ESM-only `file-type` package, which fails silently inside
+          // Vercel's bundled serverless function and makes every upload 400. The
+          // mimetype from multer is trustworthy enough given the size cap below.
+          new FileTypeValidator({
+            fileType: /^image\/(png|jpe?g|webp)$/,
+            skipMagicNumbersValidation: true,
+          }),
         ],
         fileIsRequired: true,
       }),

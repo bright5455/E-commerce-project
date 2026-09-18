@@ -3,13 +3,25 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Product } from './entity/product.entity';
 import { CreateProductDto, UpdateProductDto } from './dto/product.dto';
+import { CloudinaryService } from '../cloudinary/cloudinary.service';
 
 @Injectable()
 export class ProductService {
   constructor(
     @InjectRepository(Product)
     private readonly productRepository: Repository<Product>,
+    private readonly cloudinaryService: CloudinaryService,
   ) {}
+
+  async uploadProductImage(file: Express.Multer.File): Promise<{ imageUrl: string }> {
+    const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp'];
+    if (!allowedMimeTypes.includes(file.mimetype)) {
+      throw new BadRequestException('Only image files (JPEG, PNG, WebP) are allowed');
+    }
+
+    const result = await this.cloudinaryService.uploadProductImage(file);
+    return { imageUrl: result.secure_url };
+  }
 
 
   async findAll(query: {

@@ -33,6 +33,26 @@ export class CloudinaryService {
     });
   }
 
+  // Product photos aren't faces, so this skips the avatar's square face-crop
+  // in favor of capping the longest side and letting the aspect ratio through.
+  async uploadProductImage(file: Express.Multer.File): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'products',
+          resource_type: 'auto',
+          transformation: [{ width: 1200, height: 1200, crop: 'limit' }, { quality: 'auto' }],
+        },
+        (error, result) => {
+          if (error) return reject(error);
+          resolve(result);
+        },
+      );
+
+      uploadStream.end(file.buffer);
+    });
+  }
+
   async deleteImage(publicId: string): Promise<any> {
     return cloudinary.uploader.destroy(publicId);
   }

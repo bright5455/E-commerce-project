@@ -1,5 +1,7 @@
+import axios from 'axios';
 import { api, API_URL } from './client';
 import { ApiError } from '../errors';
+import { getAccessToken } from '../session';
 import type {
   Product,
   ProductListResponse,
@@ -91,6 +93,26 @@ export async function createProduct(payload: CreateProductPayload) {
   const { data } = await api.post<{ message: string; product: Product }>(
     '/products',
     payload,
+  );
+  return data;
+}
+
+/**
+ * POST /products/upload-image - admin/super_admin only.
+ *
+ * Bare axios on purpose, like the token refresh call in client.ts: the shared
+ * `api` instance always sends `Content-Type: application/json`, which - once
+ * already present - stops the browser from attaching the multipart boundary
+ * a FormData upload needs. Skipping the instance avoids that.
+ */
+export async function uploadProductImage(file: File) {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const { data } = await axios.post<{ imageUrl: string }>(
+    `${API_URL}/products/upload-image`,
+    formData,
+    { headers: { Authorization: `Bearer ${getAccessToken()}` } },
   );
   return data;
 }
