@@ -7,6 +7,7 @@ import {
   ManyToOne,
   OneToMany,
   JoinColumn,
+  Index,
 } from 'typeorm';
 import { User } from '../../user/entity/user.entity';
 import { OrderItem } from '../../order/entity/order-item.entity';
@@ -77,6 +78,13 @@ export class Order {
 
   @Column({ type: 'timestamp', nullable: true })
   paidAt: Date;
+
+  @Column({ nullable: true })
+  @Index()
+  paymentReference: string;
+
+  @Column({ type: 'jsonb', nullable: true })
+  gatewayResponse: any;
 
   @Column({nullable: true})
   shippingAddress: string;

@@ -8,10 +8,12 @@ import { User } from '../user/entity/user.entity';
 import { Wallet } from '../wallet/entity/wallet.entity';
 import { Cart } from '../cart/entity/cart.entity';
 import { Product } from '../product/entity/product.entity';
+import { PaystackModule } from '../payment/paystack/paystack.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Order, OrderItem, User, Wallet, Cart, Product]),
+    PaystackModule,
   ],
   controllers: [OrderController],
   providers: [OrderService],

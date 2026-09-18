@@ -7,6 +7,7 @@ import { Suspense, useCallback, useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { estimateTotals, OrderSummary } from '@/components/cart/OrderSummary';
 import { WalletPaymentPanel } from '@/components/checkout/WalletPaymentPanel';
+import { PaystackPaymentPanel } from '@/components/checkout/PaystackPaymentPanel';
 import { ProductImage } from '@/components/products/ProductImage';
 import { RequireAuth } from '@/components/providers/RequireAuth';
 import { useCart } from '@/components/providers/CartProvider';
@@ -16,11 +17,12 @@ import { InputField, TextareaField } from '@/components/ui/Field';
 import { LoadingBlock } from '@/components/ui/Spinner';
 import { EmptyState, FormError } from '@/components/ui/States';
 import { validateCart } from '@/lib/api/cart';
-import { checkout } from '@/lib/api/orders';
+import { checkout, isPaymentPending } from '@/lib/api/orders';
 import { getWallet } from '@/lib/api/wallet';
 import { toApiError } from '@/lib/errors';
-import { formatPrice, toNumber } from '@/lib/format';
+import { formatPrice, toNumber, cn } from '@/lib/format';
 import { checkoutSchema, type CheckoutFormValues } from '@/lib/validation';
+import type { Order, PaymentInitResult } from '@/lib/types';
 
 function CheckoutFlow() {
   const router = useRouter();
@@ -31,6 +33,11 @@ function CheckoutFlow() {
   const [isWalletLoading, setIsWalletLoading] = useState(true);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'wallet' | 'card'>('wallet');
+  const [pendingPayment, setPendingPayment] = useState<{
+    order: Order;
+    payment: PaymentInitResult;
+  } | null>(null);
 
   const {
     register,
@@ -70,6 +77,22 @@ function CheckoutFlow() {
     return <LoadingBlock label="Loading checkout" />;
   }
 
+  if (pendingPayment) {
+    return (
+      <div className="mx-auto max-w-md">
+        <PaystackPaymentPanel
+          order={pendingPayment.order}
+          payment={pendingPayment.payment}
+          onPaid={(order) => {
+            void refreshCart();
+            toast.success('Payment complete. Your order is confirmed.');
+            router.replace(`/orders/${order.id}/confirmation`);
+          }}
+        />
+      </div>
+    );
+  }
+
   if (!cart || cart.items.length === 0) {
     return (
       <EmptyState
@@ -102,23 +125,30 @@ function CheckoutFlow() {
         return;
       }
 
-      const order = await checkout({
+      const result = await checkout({
         shippingAddress: values.shippingAddress,
         shippingCity: values.shippingCity,
         shippingState: values.shippingState,
         shippingZipCode: values.shippingZipCode,
         shippingCountry: values.shippingCountry,
         phoneNumber: values.phoneNumber,
-        paymentMethod: 'wallet',
+        paymentMethod,
         // notes is optional on CheckoutDto and forbidNonWhitelisted is on, so
         // omit the key entirely when it is blank.
         ...(values.notes?.trim() ? { notes: values.notes.trim() } : {}),
       });
 
+      if (isPaymentPending(result)) {
+        // Card order was created PENDING - hand off to the Paystack popup.
+        // Cart/wallet are untouched until the payment is actually verified.
+        setPendingPayment(result);
+        return;
+      }
+
       // The server empties the cart as part of the same transaction.
       await refreshCart();
       toast.success('Payment complete. Your order is confirmed.');
-      router.replace(`/orders/${order.id}/confirmation`);
+      router.replace(`/orders/${result.id}/confirmation`);
     } catch (error) {
       const apiError = toApiError(error);
       setSubmitError(apiError.message);
@@ -210,12 +240,51 @@ function CheckoutFlow() {
           </div>
         </section>
 
-        <WalletPaymentPanel
-          balance={balance}
-          amountDue={totals.total}
-          isLoading={isWalletLoading}
-          onFunded={loadWallet}
-        />
+        <section
+          aria-labelledby="payment-method-heading"
+          className="rounded-xl border border-slate-200 bg-white p-5"
+        >
+          <h2 id="payment-method-heading" className="text-base font-semibold text-slate-900">
+            How would you like to pay?
+          </h2>
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setPaymentMethod('wallet')}
+              aria-pressed={paymentMethod === 'wallet'}
+              className={cn(
+                'rounded-lg border px-4 py-3 text-left text-sm font-medium transition',
+                paymentMethod === 'wallet'
+                  ? 'border-slate-900 bg-slate-900 text-white'
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
+              )}
+            >
+              Wallet
+            </button>
+            <button
+              type="button"
+              onClick={() => setPaymentMethod('card')}
+              aria-pressed={paymentMethod === 'card'}
+              className={cn(
+                'rounded-lg border px-4 py-3 text-left text-sm font-medium transition',
+                paymentMethod === 'card'
+                  ? 'border-slate-900 bg-slate-900 text-white'
+                  : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
+              )}
+            >
+              Card (Paystack)
+            </button>
+          </div>
+        </section>
+
+        {paymentMethod === 'wallet' && (
+          <WalletPaymentPanel
+            balance={balance}
+            amountDue={totals.total}
+            isLoading={isWalletLoading}
+            onFunded={loadWallet}
+          />
+        )}
       </div>
 
       <div className="space-y-4 lg:sticky lg:top-24">
@@ -268,18 +337,21 @@ function CheckoutFlow() {
               size="lg"
               fullWidth
               isLoading={busy}
-              disabled={!canAfford || isWalletLoading}
+              disabled={paymentMethod === 'wallet' && (!canAfford || isWalletLoading)}
             >
               {busy
-                ? 'Processing payment...'
-                : canAfford
-                  ? `Pay ${formatPrice(totals.total)}`
-                  : 'Top up your wallet to pay'}
+                ? 'Processing...'
+                : paymentMethod === 'wallet'
+                  ? canAfford
+                    ? `Pay ${formatPrice(totals.total)}`
+                    : 'Top up your wallet to pay'
+                  : `Continue to payment (${formatPrice(totals.total)})`}
             </Button>
 
             <p className="text-center text-xs leading-relaxed text-slate-400">
-              Paying debits your wallet, reserves the stock and creates the order in one
-              transaction. Nothing is charged if any part fails.
+              {paymentMethod === 'wallet'
+                ? 'Paying debits your wallet, reserves the stock and creates the order in one transaction. Nothing is charged if any part fails.'
+                : 'You will be asked to pay with Paystack next. Stock is only reserved once payment succeeds.'}
             </p>
           </div>
         </OrderSummary>

@@ -16,6 +16,8 @@ import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
+import { PaystackModule } from './payment/paystack/paystack.module';
+import { PaymentModule } from './payment/payment.module';
 import * as Joi from 'joi';
 
 @Module({
@@ -40,6 +42,9 @@ import * as Joi from 'joi';
         MAIL_SECURE: Joi.string().valid('true', 'false', '1', '0').optional(),
 
         FRONTEND_URL: Joi.string().uri().default('http://localhost:3000'),
+
+        PAYSTACK_SECRET_KEY: Joi.string().required(),
+        PAYSTACK_BASE_URL: Joi.string().uri().default('https://api.paystack.co'),
 
         NODE_ENV: Joi.string()
           .valid('development', 'production', 'test')
@@ -124,6 +129,8 @@ import * as Joi from 'joi';
     ProfileModule,
     MailModule,
     CloudinaryModule,
+    PaystackModule,
+    PaymentModule,
   ],
   controllers: [AppController],
   providers: [AppService],

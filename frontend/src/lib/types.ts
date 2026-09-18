@@ -180,6 +180,20 @@ export interface CheckoutPayload {
   notes?: string;
 }
 
+/** Returned by POST /orders/checkout and POST /payment/initialize for card orders. */
+export interface PaymentInitResult {
+  authorizationUrl: string;
+  accessCode: string;
+  reference: string;
+}
+
+/**
+ * POST /orders/checkout returns a bare Order for wallet payments, or
+ * { order, payment } for card/bank_transfer - the order is created PENDING and
+ * unpaid, and `payment` carries what's needed to open the Paystack popup.
+ */
+export type CheckoutResult = Order | { order: Order; payment: PaymentInitResult };
+
 /** GET /wallet - WalletService.getBalance returns this, not the Wallet entity. */
 export interface WalletBalance {
   walletId: string;

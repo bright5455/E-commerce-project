@@ -1,5 +1,12 @@
 import { api } from './client';
-import type { CheckoutPayload, Order, OrderStatus, PaginatedResponse } from '../types';
+import type {
+  CheckoutPayload,
+  CheckoutResult,
+  Order,
+  OrderStatus,
+  PaginatedResponse,
+  PaymentInitResult,
+} from '../types';
 
 export interface OrderQuery {
   page?: number;
@@ -10,14 +17,26 @@ export interface OrderQuery {
 /**
  * POST /orders/checkout
  *
- * This is the payment step. The backend reads the caller's cart, prices it,
- * debits the wallet, writes the order, decrements stock and empties the cart -
- * all inside one transaction. A 400 here means the cart is empty, stock ran out
- * or the wallet balance is too low; nothing is charged in any of those cases.
+ * For `paymentMethod: 'wallet'`, the backend reads the caller's cart, prices
+ * it, debits the wallet, writes the order, decrements stock and empties the
+ * cart - all inside one transaction - and this resolves to the finished Order.
+ *
+ * For `paymentMethod: 'card'`, the backend instead creates a PENDING, unpaid
+ * order (wallet/stock/cart untouched) and initializes a Paystack transaction
+ * for it, resolving to `{ order, payment }`. The order is only fulfilled once
+ * the Paystack popup succeeds and the backend verifies it - see
+ * lib/api/payment.ts and PaystackPaymentPanel.
  */
 export async function checkout(payload: CheckoutPayload) {
-  const { data } = await api.post<Order>('/orders/checkout', payload);
+  const { data } = await api.post<CheckoutResult>('/orders/checkout', payload);
   return data;
+}
+
+/** True when checkout() is still awaiting a Paystack payment, not a finished Order. */
+export function isPaymentPending(
+  result: CheckoutResult,
+): result is { order: Order; payment: PaymentInitResult } {
+  return 'payment' in result;
 }
 
 /** GET /orders/my-orders */

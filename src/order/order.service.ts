@@ -6,7 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, Between } from 'typeorm';
+import { Repository, DataSource, Between, EntityManager } from 'typeorm';
 import { Order, OrderStatus, PaymentMethod } from './entity/order.entity';
 import { OrderItem } from './entity/order-item.entity';
 import { User } from '../user/entity/user.entity';
@@ -25,6 +25,19 @@ import {
   CancelOrderDto,
   OrderQueryDto,
 } from './dto/order.dto';
+import { PaystackService } from '../payment/paystack/paystack.service';
+
+interface VerifiedPayment {
+  status: string;
+  amountKobo: number;
+  raw: any;
+}
+
+export interface PaymentInitResult {
+  authorizationUrl: string;
+  accessCode: string;
+  reference: string;
+}
 
 @Injectable()
 export class OrderService {
@@ -44,6 +57,7 @@ export class OrderService {
     @InjectRepository(Product)
     private readonly productRepository: Repository<Product>,
     private readonly dataSource: DataSource,
+    private readonly paystackService: PaystackService,
   ) {}
 
   private validateStatusTransition(currentStatus: OrderStatus, newStatus: OrderStatus) {
@@ -77,6 +91,93 @@ export class OrderService {
     const tax = this.round(subtotal * 0.1);
     const shippingFee = subtotal > 500 ? 0 : 50;
     return { tax, shippingFee, total: this.round(subtotal + tax + shippingFee) };
+  }
+
+  /** Reads the caller's cart, validates stock/availability, and computes order totals. */
+  private async buildOrderItemsFromCart(manager: EntityManager, userId: string) {
+    const cartItems = await manager.find(Cart, {
+      where: { userId },
+      relations: ['product'],
+    });
+
+    if (cartItems.length === 0) {
+      throw new BadRequestException('Cart is empty');
+    }
+
+    let subtotal = 0;
+    const orderItems: Partial<OrderItem>[] = [];
+
+    for (const item of cartItems) {
+      const product = item.product;
+
+      if (!product || !product.isActive) {
+        throw new BadRequestException(
+          `${product?.name ?? 'A product in your cart'} is no longer available`,
+        );
+      }
+
+      if (product.stock < item.quantity) {
+        throw new BadRequestException(
+          `Insufficient stock for ${product.name}. Available: ${product.stock}, requested: ${item.quantity}`,
+        );
+      }
+
+      const price = Number(product.price);
+      const itemTotal = this.round(price * item.quantity);
+      subtotal = this.round(subtotal + itemTotal);
+
+      orderItems.push({
+        productId: product.id,
+        productName: product.name,
+        productImage: product.imageUrl,
+        price,
+        quantity: item.quantity,
+        total: itemTotal,
+      });
+    }
+
+    const { tax, shippingFee, total } = this.calculateTotals(subtotal);
+
+    return { cartItems, orderItems, subtotal, tax, shippingFee, total };
+  }
+
+  /** Decrements stock, writes the payment Transaction record, and clears the cart. */
+  private async applyFulfillment(
+    manager: EntityManager,
+    params: {
+      orderId: string;
+      items: { productId: string; quantity: number }[];
+      walletId: string;
+      userId: string;
+      amount: number;
+      balanceBefore: number;
+      balanceAfter: number;
+      description: string;
+      metadata?: any;
+    },
+  ): Promise<void> {
+    for (const item of params.items) {
+      await manager.decrement(Product, { id: item.productId }, 'stock', item.quantity);
+    }
+
+    await manager.save(
+      Transaction,
+      manager.create(Transaction, {
+        walletId: params.walletId,
+        userId: params.userId,
+        type: TransactionType.PAYMENT,
+        amount: params.amount,
+        balanceBefore: params.balanceBefore,
+        balanceAfter: params.balanceAfter,
+        status: TransactionStatus.COMPLETED,
+        description: params.description,
+        referenceId: params.orderId,
+        referenceType: 'order',
+        metadata: params.metadata,
+      }),
+    );
+
+    await manager.delete(Cart, { userId: params.userId });
   }
 
   async create(userId: string, createOrderDto: CreateOrderDto) {
@@ -172,54 +273,23 @@ export class OrderService {
     }
   }
 
-  async checkout(userId: string, checkoutDto: CheckoutDto) {
+  async checkout(
+    userId: string,
+    checkoutDto: CheckoutDto,
+  ): Promise<Order | { order: Order; payment: PaymentInitResult }> {
+    const method = checkoutDto.paymentMethod ?? PaymentMethod.WALLET;
+
+    if (method !== PaymentMethod.WALLET) {
+      return this.checkoutWithPaystack(userId, checkoutDto, method);
+    }
+
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
 
     try {
-      const cartItems = await queryRunner.manager.find(Cart, {
-        where: { userId },
-        relations: ['product'],
-      });
-
-      if (cartItems.length === 0) {
-        throw new BadRequestException('Cart is empty');
-      }
-
-      let subtotal = 0;
-      const orderItems: Partial<OrderItem>[] = [];
-
-      for (const item of cartItems) {
-        const product = item.product;
-
-        if (!product || !product.isActive) {
-          throw new BadRequestException(
-            `${product?.name ?? 'A product in your cart'} is no longer available`,
-          );
-        }
-
-        if (product.stock < item.quantity) {
-          throw new BadRequestException(
-            `Insufficient stock for ${product.name}. Available: ${product.stock}, requested: ${item.quantity}`,
-          );
-        }
-
-        const price = Number(product.price);
-        const itemTotal = this.round(price * item.quantity);
-        subtotal = this.round(subtotal + itemTotal);
-
-        orderItems.push({
-          productId: product.id,
-          productName: product.name,
-          productImage: product.imageUrl,
-          price,
-          quantity: item.quantity,
-          total: itemTotal,
-        });
-      }
-
-      const { tax, shippingFee, total } = this.calculateTotals(subtotal);
+      const { cartItems, orderItems, subtotal, tax, shippingFee, total } =
+        await this.buildOrderItemsFromCart(queryRunner.manager, userId);
 
       const wallet = await queryRunner.manager.findOne(Wallet, {
         where: { userId },
@@ -248,7 +318,7 @@ export class OrderService {
         shippingFee,
         total,
         status: OrderStatus.PROCESSING,
-        paymentMethod: checkoutDto.paymentMethod || PaymentMethod.WALLET,
+        paymentMethod: PaymentMethod.WALLET,
         isPaid: true,
         paidAt: new Date(),
         shippingAddress: checkoutDto.shippingAddress,
@@ -269,32 +339,19 @@ export class OrderService {
         );
       }
 
-      for (const item of cartItems) {
-        await queryRunner.manager.decrement(
-          Product,
-          { id: item.productId },
-          'stock',
-          item.quantity,
-        );
-      }
-
-      await queryRunner.manager.save(
-        Transaction,
-        queryRunner.manager.create(Transaction, {
-          walletId: wallet.id,
-          userId,
-          type: TransactionType.PAYMENT,
-          amount: total,
-          balanceBefore,
-          balanceAfter,
-          status: TransactionStatus.COMPLETED,
-          description: `Payment for order ${savedOrder.id}`,
-          referenceId: savedOrder.id,
-          referenceType: 'order',
-        }),
-      );
-
-      await queryRunner.manager.delete(Cart, { userId });
+      await this.applyFulfillment(queryRunner.manager, {
+        orderId: savedOrder.id,
+        items: cartItems.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+        })),
+        walletId: wallet.id,
+        userId,
+        amount: total,
+        balanceBefore,
+        balanceAfter,
+        description: `Payment for order ${savedOrder.id}`,
+      });
 
       await queryRunner.commitTransaction();
 
@@ -304,6 +361,228 @@ export class OrderService {
     } catch (error) {
       await queryRunner.rollbackTransaction();
       this.logger.error('Checkout failed:', error);
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+  }
+
+  /**
+   * Card/bank-transfer checkout: creates a PENDING, unpaid order from the cart
+   * (wallet/stock/cart untouched), then initializes a Paystack transaction for it.
+   * The order is only fulfilled later by finalizePaidOrder(), driven by the
+   * verify endpoint and/or the Paystack webhook.
+   */
+  private async checkoutWithPaystack(
+    userId: string,
+    checkoutDto: CheckoutDto,
+    method: PaymentMethod,
+  ): Promise<{ order: Order; payment: PaymentInitResult }> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    let savedOrder: Order;
+
+    try {
+      const { orderItems, subtotal, tax, shippingFee, total } =
+        await this.buildOrderItemsFromCart(queryRunner.manager, userId);
+
+      const order = this.orderRepository.create({
+        userId,
+        subtotal,
+        tax,
+        shippingFee,
+        total,
+        status: OrderStatus.PENDING,
+        paymentMethod: method,
+        isPaid: false,
+        shippingAddress: checkoutDto.shippingAddress,
+        shippingCity: checkoutDto.shippingCity,
+        shippingState: checkoutDto.shippingState,
+        shippingZipCode: checkoutDto.shippingZipCode,
+        shippingCountry: checkoutDto.shippingCountry,
+        phoneNumber: checkoutDto.phoneNumber,
+        notes: checkoutDto.notes,
+      });
+
+      savedOrder = await queryRunner.manager.save(Order, order);
+
+      for (const item of orderItems) {
+        await queryRunner.manager.save(
+          OrderItem,
+          this.orderItemRepository.create({ ...item, orderId: savedOrder.id }),
+        );
+      }
+
+      await queryRunner.commitTransaction();
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      this.logger.error('Checkout (card) failed:', error);
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
+
+    // Never hold a DB transaction open across an external HTTP call.
+    const payment = await this.initiatePaystackPayment(savedOrder, userId);
+
+    return { order: await this.findOne(savedOrder.id), payment };
+  }
+
+  private async initiatePaystackPayment(
+    order: Order,
+    userId: string,
+  ): Promise<PaymentInitResult> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const payment = await this.paystackService.initializeTransaction({
+      email: user.email,
+      amountNaira: Number(order.total),
+      orderId: order.id,
+      callbackPath: '/checkout/callback',
+    });
+
+    await this.orderRepository.update(order.id, {
+      paymentReference: payment.reference,
+    });
+
+    return {
+      authorizationUrl: payment.authorization_url,
+      accessCode: payment.access_code,
+      reference: payment.reference,
+    };
+  }
+
+  /** Re-initializes a fresh Paystack payment session for an unpaid, pending card order. */
+  async retryPayment(
+    orderId: string,
+    userId: string,
+  ): Promise<{ order: Order; payment: PaymentInitResult }> {
+    const order = await this.findOne(orderId);
+
+    if (order.userId !== userId) {
+      throw new ForbiddenException('You can only retry payment on your own orders');
+    }
+
+    if (order.paymentMethod === PaymentMethod.WALLET) {
+      throw new BadRequestException('Wallet orders cannot be retried through Paystack');
+    }
+
+    if (order.isPaid || order.status !== OrderStatus.PENDING) {
+      throw new BadRequestException('This order is not awaiting payment');
+    }
+
+    const payment = await this.initiatePaystackPayment(order, userId);
+
+    return { order: await this.findOne(order.id), payment };
+  }
+
+  /**
+   * Idempotently finalizes a Paystack-paid order: called by both the frontend's
+   * verify request and the webhook, whichever arrives first "wins". A row lock
+   * plus the isPaid check prevent double-fulfillment from Paystack's at-least-once
+   * webhook delivery.
+   */
+  async finalizePaidOrder(reference: string, verified: VerifiedPayment): Promise<Order> {
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // Locked via createQueryBuilder with no relations joined: Postgres refuses
+      // FOR UPDATE combined with a LEFT JOIN on the nullable side, which is what
+      // Order.items being an eager relation would otherwise produce here.
+      const order = await queryRunner.manager
+        .createQueryBuilder(Order, 'order')
+        .where('order.paymentReference = :reference', { reference })
+        .setLock('pessimistic_write')
+        .getOne();
+
+      if (!order) {
+        throw new NotFoundException(`No order found for reference ${reference}`);
+      }
+
+      const items = await queryRunner.manager.find(OrderItem, {
+        where: { orderId: order.id },
+      });
+
+      if (order.isPaid) {
+        await queryRunner.rollbackTransaction();
+        return order;
+      }
+
+      if (verified.status !== 'success') {
+        this.logger.warn(
+          `Payment for order ${order.id} not successful (status: ${verified.status})`,
+        );
+        await queryRunner.rollbackTransaction();
+        return order;
+      }
+
+      const expectedKobo = Math.round(Number(order.total) * 100);
+      if (expectedKobo !== verified.amountKobo) {
+        this.logger.error(
+          `Amount mismatch for order ${order.id}: expected ${expectedKobo} kobo, received ${verified.amountKobo} kobo`,
+        );
+        throw new BadRequestException('Payment amount does not match order total');
+      }
+
+      for (const item of items) {
+        const product = await queryRunner.manager.findOne(Product, {
+          where: { id: item.productId },
+        });
+
+        if (!product || product.stock < item.quantity) {
+          this.logger.error(
+            `Insufficient stock finalizing order ${order.id} for product ${item.productId}`,
+          );
+          throw new BadRequestException(`Insufficient stock for ${item.productName}`);
+        }
+      }
+
+      const wallet = await queryRunner.manager.findOne(Wallet, {
+        where: { userId: order.userId },
+      });
+
+      if (!wallet) {
+        throw new NotFoundException('Wallet not found for order owner');
+      }
+
+      const walletBalance = Number(wallet.balance);
+
+      await this.applyFulfillment(queryRunner.manager, {
+        orderId: order.id,
+        items: items.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+        })),
+        walletId: wallet.id,
+        userId: order.userId,
+        amount: Number(order.total),
+        balanceBefore: walletBalance,
+        balanceAfter: walletBalance,
+        description: `Paystack payment for order ${order.id}`,
+        metadata: { gateway: 'paystack', reference, gatewayResponse: verified.raw },
+      });
+
+      order.status = OrderStatus.PROCESSING;
+      order.isPaid = true;
+      order.paidAt = new Date();
+      order.gatewayResponse = verified.raw;
+      await queryRunner.manager.save(Order, order);
+
+      await queryRunner.commitTransaction();
+
+      this.logger.log(`Paystack payment finalized for order ${order.id}`);
+
+      return this.findOne(order.id);
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      this.logger.error('Failed to finalize Paystack payment:', error);
       throw error;
     } finally {
       await queryRunner.release();
@@ -439,6 +718,24 @@ export class OrderService {
       );
     }
 
+    // Paystack refund is called outside the DB transaction below - never hold a
+    // DB connection open across an external HTTP call.
+    let paystackRefundRequested = false;
+
+    if (
+      order.isPaid &&
+      order.paymentMethod !== PaymentMethod.WALLET &&
+      order.paymentReference
+    ) {
+      try {
+        await this.paystackService.refundTransaction(order.paymentReference);
+        paystackRefundRequested = true;
+      } catch (error) {
+        this.logger.error(`Failed to request Paystack refund for order ${id}:`, error);
+        throw error;
+      }
+    }
+
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -451,17 +748,45 @@ export class OrderService {
       await queryRunner.manager.save(order);
 
       if (order.isPaid) {
-        const wallet = await queryRunner.manager.findOne(Wallet, {
-          where: { userId },
-        });
+        if (order.paymentMethod === PaymentMethod.WALLET) {
+          const wallet = await queryRunner.manager.findOne(Wallet, {
+            where: { userId },
+          });
 
-        if (wallet) {
-          wallet.balance = Number(wallet.balance) + Number(order.total);
-          await queryRunner.manager.save(wallet);
+          if (wallet) {
+            wallet.balance = Number(wallet.balance) + Number(order.total);
+            await queryRunner.manager.save(wallet);
 
-          this.logger.log(
-            `Refunded $${order.total} to wallet for cancelled order ${id}`,
-          );
+            this.logger.log(
+              `Refunded $${order.total} to wallet for cancelled order ${id}`,
+            );
+          }
+        } else if (paystackRefundRequested) {
+          // Paystack refunds are asynchronous - this logs the request as PENDING;
+          // reconciling it to COMPLETED would need a `refund.processed` webhook
+          // handler, which is a known follow-up, not implemented here.
+          const wallet = await queryRunner.manager.findOne(Wallet, {
+            where: { userId },
+          });
+
+          if (wallet) {
+            await queryRunner.manager.save(
+              Transaction,
+              queryRunner.manager.create(Transaction, {
+                walletId: wallet.id,
+                userId,
+                type: TransactionType.REFUND,
+                amount: Number(order.total),
+                status: TransactionStatus.PENDING,
+                description: `Paystack refund requested for cancelled order ${id}`,
+                referenceId: order.id,
+                referenceType: 'order',
+                metadata: { gateway: 'paystack', reference: order.paymentReference },
+              }),
+            );
+          }
+
+          this.logger.log(`Paystack refund requested for cancelled order ${id}`);
         }
       }
 

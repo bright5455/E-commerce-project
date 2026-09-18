@@ -36,8 +36,8 @@ export default function OrderConfirmationPage({
           Thank you, your order is confirmed
         </h1>
         <p className="mx-auto mt-3 max-w-lg text-sm leading-relaxed text-slate-600">
-          Payment was taken from your wallet and the order is now being prepared. Keep the
-          reference below if you need to get in touch.
+          Payment was successful and the order is now being prepared. Keep the reference
+          below if you need to get in touch.
         </p>
 
         <div className="mt-7 flex flex-wrap justify-center gap-3">
