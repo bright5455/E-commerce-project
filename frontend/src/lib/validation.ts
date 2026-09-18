@@ -96,3 +96,25 @@ export const profileSchema = z.object({
 });
 
 export type ProfileFormValues = z.infer<typeof profileSchema>;
+
+/** Mirrors CreateProductDto: name/description as strings, price/stock as @Min(0) numbers. */
+export const createProductSchema = z.object({
+  name: z.string().trim().min(2, 'Name must be at least 2 characters'),
+  description: z.string().trim().min(10, 'Description must be at least 10 characters'),
+  price: z.coerce
+    .number({ invalid_type_error: 'Enter a price' })
+    .min(0, 'Price cannot be negative'),
+  stock: z.coerce
+    .number({ invalid_type_error: 'Enter a stock quantity' })
+    .int('Stock must be a whole number')
+    .min(0, 'Stock cannot be negative'),
+  imageUrl: z
+    .string()
+    .trim()
+    .optional()
+    .refine((value) => !value || /^https?:\/\//.test(value), {
+      message: 'Enter a valid image URL starting with http:// or https://',
+    }),
+});
+
+export type CreateProductFormValues = z.infer<typeof createProductSchema>;

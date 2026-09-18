@@ -1,4 +1,4 @@
-import { API_URL } from './client';
+import { api, API_URL } from './client';
 import { ApiError } from '../errors';
 import type {
   Product,
@@ -76,4 +76,21 @@ export function searchProducts(q: string) {
 /** GET /products/top-selling - returns a bare array, not a wrapper object. */
 export function getTopSelling(limit = 8) {
   return getJson<Product[]>(`/products/top-selling?limit=${limit}`);
+}
+
+export interface CreateProductPayload {
+  name: string;
+  description: string;
+  price: number;
+  stock: number;
+  imageUrl?: string;
+}
+
+/** POST /products - admin/super_admin only, guarded by JwtAuthGuard + RolesGuard. */
+export async function createProduct(payload: CreateProductPayload) {
+  const { data } = await api.post<{ message: string; product: Product }>(
+    '/products',
+    payload,
+  );
+  return data;
 }
