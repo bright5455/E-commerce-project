@@ -208,13 +208,22 @@ export function Header() {
                       Wallet
                     </Link>
                     {ADMIN_ROLES.has(user.role) && (
-                      <Link
-                        href="/admin/products/new"
-                        role="menuitem"
-                        className="block px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                      >
-                        Add product
-                      </Link>
+                      <>
+                        <Link
+                          href="/admin/products/new"
+                          role="menuitem"
+                          className="block px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                        >
+                          Add product
+                        </Link>
+                        <Link
+                          href="/admin/orders"
+                          role="menuitem"
+                          className="block px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                        >
+                          Manage orders
+                        </Link>
+                      </>
                     )}
                     <button
                       type="button"
@@ -312,12 +321,20 @@ export function Header() {
                     Profile
                   </Link>
                   {user && ADMIN_ROLES.has(user.role) && (
-                    <Link
-                      href="/admin/products/new"
-                      className="rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                    >
-                      Add product
-                    </Link>
+                    <>
+                      <Link
+                        href="/admin/products/new"
+                        className="rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                      >
+                        Add product
+                      </Link>
+                      <Link
+                        href="/admin/orders"
+                        className="rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                      >
+                        Manage orders
+                      </Link>
+                    </>
                   )}
                 </>
               )}

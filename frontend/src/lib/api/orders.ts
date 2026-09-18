@@ -58,3 +58,29 @@ export async function cancelOrder(id: string, reason: string) {
   const { data } = await api.patch<Order>(`/orders/${id}/cancel`, { reason });
   return data;
 }
+
+/** An order as the admin listing returns it - joined with the customer who placed it. */
+export interface AdminOrder extends Order {
+  user?: { id: string; email: string; firstName: string; lastName: string } | null;
+}
+
+/** GET /orders - admin/super_admin only, every order rather than just the caller's. */
+export async function getAllOrders(query: OrderQuery = {}) {
+  const { data } = await api.get<PaginatedResponse<AdminOrder>>('/orders', {
+    params: query,
+  });
+  return data;
+}
+
+/** PATCH /orders/:id/status - admin/super_admin only; the backend enforces the transition order. */
+export async function updateOrderStatus(
+  id: string,
+  status: OrderStatus,
+  trackingNumber?: string,
+) {
+  const { data } = await api.patch<Order>(`/orders/${id}/status`, {
+    status,
+    ...(trackingNumber ? { trackingNumber } : {}),
+  });
+  return data;
+}

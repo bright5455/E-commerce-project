@@ -97,6 +97,12 @@ export async function createProduct(payload: CreateProductPayload) {
   return data;
 }
 
+/** DELETE /products/:id - admin/super_admin only. */
+export async function deleteProduct(id: string) {
+  const { data } = await api.delete<{ message: string }>(`/products/${id}`);
+  return data;
+}
+
 /**
  * POST /products/upload-image - admin/super_admin only.
  *

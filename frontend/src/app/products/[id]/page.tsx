@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { AdminProductActions } from '@/components/products/AdminProductActions';
 import { ProductImage } from '@/components/products/ProductImage';
 import { ProductPurchasePanel } from '@/components/products/ProductPurchasePanel';
 import { StockBadge } from '@/components/ui/Badge';
@@ -140,6 +141,8 @@ export default async function ProductDetailPage({ params }: PageProps) {
           </div>
 
           <ProductPurchasePanel product={product} />
+
+          <AdminProductActions product={product} />
 
           <dl className="grid grid-cols-2 gap-4 border-t border-slate-200 pt-6 text-sm">
             <div>
