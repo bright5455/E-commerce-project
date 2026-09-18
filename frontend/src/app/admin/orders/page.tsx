@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { LoadingBlock } from '@/components/ui/Spinner';
 import { EmptyState, ErrorState } from '@/components/ui/States';
 import { getAllOrders, updateOrderStatus, type AdminOrder } from '@/lib/api/orders';
+import { getUserStats, type UserStats } from '@/lib/api/users';
 import { getErrorMessage } from '@/lib/errors';
 import { formatDateTime, formatPrice, orderReference } from '@/lib/format';
 import type { OrderStatus } from '@/lib/types';
@@ -25,6 +26,46 @@ const NEXT_STEP: Partial<Record<OrderStatus, { status: OrderStatus; label: strin
   shipped: { status: 'delivered', label: 'Mark as delivered' },
   delivered: { status: 'completed', label: 'Mark as completed' },
 };
+
+function UserStatsBanner() {
+  const [stats, setStats] = useState<UserStats | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getUserStats()
+      .then((data) => {
+        if (!cancelled) setStats(data);
+      })
+      .catch(() => {
+        // Non-critical: the orders list is the point of this page, so a
+        // failed stats fetch just hides the banner instead of erroring out.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!stats) return null;
+
+  const tiles: Array<{ label: string; value: number }> = [
+    { label: 'Total users', value: stats.totalUsers },
+    { label: 'Active users', value: stats.activeUsers },
+    { label: 'Admin accounts', value: stats.adminAccounts },
+  ];
+
+  return (
+    <div className="mb-8 grid grid-cols-3 gap-3">
+      {tiles.map((tile) => (
+        <div key={tile.label} className="rounded-xl border border-slate-200 bg-white p-4">
+          <p className="text-2xl font-semibold tracking-tight text-slate-900">
+            {tile.value.toLocaleString()}
+          </p>
+          <p className="mt-0.5 text-xs font-medium text-slate-500">{tile.label}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function AdminOnly() {
   return (
@@ -174,9 +215,10 @@ function AdminOrdersGate() {
           <h1 className="mb-2 text-3xl font-semibold tracking-tight text-slate-900">
             Manage orders
           </h1>
-          <p className="mb-8 text-sm text-slate-500">
+          <p className="mb-6 text-sm text-slate-500">
             Advance an order to the next fulfillment stage as it ships and arrives.
           </p>
+          <UserStatsBanner />
           <AdminOrdersList />
         </div>
       ) : (
