@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import { RequireAuth } from '@/components/providers/RequireAuth';
-import { OrderStatusBadge } from '@/components/ui/Badge';
+import { OrderStatusBadge, PaymentBadge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { LoadingBlock } from '@/components/ui/Spinner';
 import { EmptyState, ErrorState } from '@/components/ui/States';
@@ -112,6 +112,7 @@ function OrdersList() {
                         {orderReference(order.id)}
                       </span>
                       <OrderStatusBadge status={order.status} />
+                      <PaymentBadge isPaid={order.isPaid} />
                     </div>
                     <p className="mt-1.5 text-sm text-slate-500">
                       {formatDateTime(order.createdAt)} &middot; {order.items.length} item
