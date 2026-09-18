@@ -84,3 +84,23 @@ export async function updateOrderStatus(
   });
   return data;
 }
+
+export interface OrderStats {
+  totalOrders: number;
+  ordersByStatus: Partial<Record<OrderStatus, number>>;
+  revenue: { thisMonth: number; lastMonth: number; growth: number };
+  orders: { thisMonth: number };
+  topProducts: Array<{
+    productId: string;
+    productName: string;
+    totalQuantity: string;
+    totalRevenue: string;
+  }>;
+  recentOrders: AdminOrder[];
+}
+
+/** GET /orders/admin/stats - admin/super_admin only. */
+export async function getOrderStats() {
+  const { data } = await api.get<OrderStats>('/orders/admin/stats');
+  return data;
+}

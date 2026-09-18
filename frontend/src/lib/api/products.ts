@@ -103,6 +103,37 @@ export async function deleteProduct(id: string) {
   return data;
 }
 
+export interface UpdateProductPayload {
+  name?: string;
+  description?: string;
+  price?: number;
+  stock?: number;
+  imageUrl?: string;
+}
+
+/** PATCH /products/:id - admin/super_admin only. */
+export async function updateProduct(id: string, payload: UpdateProductPayload) {
+  const { data } = await api.patch<{ message: string; product: Product }>(
+    `/products/${id}`,
+    payload,
+  );
+  return data;
+}
+
+export interface LowStockResponse {
+  products: Product[];
+  count: number;
+  threshold: number;
+}
+
+/** GET /products/admin/low-stock - admin/super_admin only. */
+export async function getLowStockProducts(threshold = 10) {
+  const { data } = await api.get<LowStockResponse>('/products/admin/low-stock', {
+    params: { threshold },
+  });
+  return data;
+}
+
 /**
  * POST /products/upload-image - admin/super_admin only.
  *

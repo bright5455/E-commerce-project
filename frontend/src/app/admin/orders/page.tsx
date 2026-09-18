@@ -9,11 +9,19 @@ import { OrderStatusBadge, PaymentBadge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { LoadingBlock } from '@/components/ui/Spinner';
 import { EmptyState, ErrorState } from '@/components/ui/States';
-import { getAllOrders, updateOrderStatus, type AdminOrder } from '@/lib/api/orders';
+import { ProductImage } from '@/components/products/ProductImage';
+import {
+  getAllOrders,
+  getOrderStats,
+  updateOrderStatus,
+  type AdminOrder,
+  type OrderStats,
+} from '@/lib/api/orders';
+import { getLowStockProducts } from '@/lib/api/products';
 import { getUserStats, type UserStats } from '@/lib/api/users';
 import { getErrorMessage } from '@/lib/errors';
 import { formatDateTime, formatPrice, orderReference } from '@/lib/format';
-import type { OrderStatus } from '@/lib/types';
+import type { OrderStatus, Product } from '@/lib/types';
 
 const ADMIN_ROLES = new Set(['admin', 'super_admin']);
 const PAGE_SIZE = 10;
@@ -27,42 +35,103 @@ const NEXT_STEP: Partial<Record<OrderStatus, { status: OrderStatus; label: strin
   delivered: { status: 'completed', label: 'Mark as completed' },
 };
 
-function UserStatsBanner() {
-  const [stats, setStats] = useState<UserStats | null>(null);
+function StatsBanner() {
+  const [userStats, setUserStats] = useState<UserStats | null>(null);
+  const [orderStats, setOrderStats] = useState<OrderStats | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    // Independent, best-effort fetches: the orders list below is the point of
+    // this page, so either stats call failing just hides its own tiles.
     getUserStats()
-      .then((data) => {
-        if (!cancelled) setStats(data);
-      })
-      .catch(() => {
-        // Non-critical: the orders list is the point of this page, so a
-        // failed stats fetch just hides the banner instead of erroring out.
-      });
+      .then((data) => !cancelled && setUserStats(data))
+      .catch(() => {});
+    getOrderStats()
+      .then((data) => !cancelled && setOrderStats(data))
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
   }, []);
 
-  if (!stats) return null;
+  if (!userStats && !orderStats) return null;
 
-  const tiles: Array<{ label: string; value: number }> = [
-    { label: 'Total users', value: stats.totalUsers },
-    { label: 'Active users', value: stats.activeUsers },
-    { label: 'Admin accounts', value: stats.adminAccounts },
+  const tiles: Array<{ label: string; value: string }> = [
+    ...(userStats
+      ? [
+          { label: 'Total users', value: userStats.totalUsers.toLocaleString() },
+          { label: 'Active users', value: userStats.activeUsers.toLocaleString() },
+        ]
+      : []),
+    ...(orderStats
+      ? [
+          { label: 'Total orders', value: orderStats.totalOrders.toLocaleString() },
+          { label: 'Orders this month', value: orderStats.orders.thisMonth.toLocaleString() },
+          { label: 'Revenue this month', value: formatPrice(orderStats.revenue.thisMonth) },
+          {
+            label: 'Revenue growth',
+            value: `${orderStats.revenue.growth >= 0 ? '+' : ''}${orderStats.revenue.growth.toFixed(1)}%`,
+          },
+        ]
+      : []),
   ];
 
   return (
-    <div className="mb-8 grid grid-cols-3 gap-3">
+    <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
       {tiles.map((tile) => (
         <div key={tile.label} className="rounded-xl border border-slate-200 bg-white p-4">
-          <p className="text-2xl font-semibold tracking-tight text-slate-900">
-            {tile.value.toLocaleString()}
-          </p>
+          <p className="text-xl font-semibold tracking-tight text-slate-900">{tile.value}</p>
           <p className="mt-0.5 text-xs font-medium text-slate-500">{tile.label}</p>
         </div>
       ))}
+    </div>
+  );
+}
+
+function LowStockAlert() {
+  const [products, setProducts] = useState<Product[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    getLowStockProducts(10)
+      .then((data) => !cancelled && setProducts(data.products))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!products || products.length === 0) return null;
+
+  return (
+    <div className="mb-8 rounded-xl border border-amber-200 bg-amber-50 p-4">
+      <p className="text-sm font-semibold text-amber-900">
+        {products.length} product{products.length === 1 ? '' : 's'} low on stock
+      </p>
+      <ul className="mt-3 space-y-2">
+        {products.map((product) => (
+          <li key={product.id}>
+            <Link
+              href={`/products/${product.id}`}
+              className="flex items-center gap-3 rounded-lg border border-amber-100 bg-white p-2.5 transition hover:border-amber-300"
+            >
+              <div className="h-10 w-10 shrink-0 overflow-hidden rounded-md bg-slate-50">
+                <ProductImage
+                  src={product.imageUrl}
+                  alt={product.name}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+              <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-900">
+                {product.name}
+              </span>
+              <span className="shrink-0 text-sm font-semibold text-amber-700">
+                {product.stock} left
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -212,13 +281,32 @@ function AdminOrdersGate() {
     <RequireAuth>
       {user && ADMIN_ROLES.has(user.role) ? (
         <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-8">
-          <h1 className="mb-2 text-3xl font-semibold tracking-tight text-slate-900">
-            Manage orders
-          </h1>
-          <p className="mb-6 text-sm text-slate-500">
-            Advance an order to the next fulfillment stage as it ships and arrives.
-          </p>
-          <UserStatsBanner />
+          <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-semibold tracking-tight text-slate-900">
+                Manage orders
+              </h1>
+              <p className="mt-2 text-sm text-slate-500">
+                Advance an order to the next fulfillment stage as it ships and arrives.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Link
+                href="/admin/products/new"
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
+              >
+                Add product
+              </Link>
+              <Link
+                href="/admin/users"
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
+              >
+                Manage users
+              </Link>
+            </div>
+          </div>
+          <StatsBanner />
+          <LowStockAlert />
           <AdminOrdersList />
         </div>
       ) : (

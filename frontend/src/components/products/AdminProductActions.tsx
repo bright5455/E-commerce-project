@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
@@ -35,8 +36,16 @@ export function AdminProductActions({ product }: { product: Product }) {
   }
 
   return (
-    <div className="rounded-xl border border-red-200 bg-red-50 p-4">
-      <p className="text-sm font-medium text-red-900">Admin</p>
+    <div
+      className={
+        isConfirming
+          ? 'rounded-xl border border-red-200 bg-red-50 p-4'
+          : 'rounded-xl border border-slate-200 bg-slate-50 p-4'
+      }
+    >
+      <p className={isConfirming ? 'text-sm font-medium text-red-900' : 'text-sm font-medium text-slate-700'}>
+        Admin
+      </p>
 
       {isConfirming ? (
         <div className="mt-2 space-y-3">
@@ -66,15 +75,21 @@ export function AdminProductActions({ product }: { product: Product }) {
           </div>
         </div>
       ) : (
-        <Button
-          type="button"
-          variant="danger"
-          size="sm"
-          className="mt-2"
-          onClick={() => setIsConfirming(true)}
-        >
-          Delete product
-        </Button>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Link href={`/admin/products/${product.id}/edit`}>
+            <Button type="button" variant="secondary" size="sm">
+              Edit product
+            </Button>
+          </Link>
+          <Button
+            type="button"
+            variant="danger"
+            size="sm"
+            onClick={() => setIsConfirming(true)}
+          >
+            Delete product
+          </Button>
+        </div>
       )}
     </div>
   );

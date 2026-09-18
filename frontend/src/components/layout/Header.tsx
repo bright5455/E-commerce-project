@@ -223,6 +223,13 @@ export function Header() {
                         >
                           Manage orders
                         </Link>
+                        <Link
+                          href="/admin/users"
+                          role="menuitem"
+                          className="block px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                        >
+                          Manage users
+                        </Link>
                       </>
                     )}
                     <button
@@ -333,6 +340,12 @@ export function Header() {
                         className="rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
                       >
                         Manage orders
+                      </Link>
+                      <Link
+                        href="/admin/users"
+                        className="rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                      >
+                        Manage users
                       </Link>
                     </>
                   )}
