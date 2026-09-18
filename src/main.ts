@@ -1,57 +1,11 @@
-import { NestFactory, Reflector } from '@nestjs/core';
-import { ValidationPipe, ClassSerializerInterceptor } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import helmet from 'helmet';
+import { configureApp } from './bootstrap';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { rawBody: true });
 
-  // Apply Helmet to all routes except Swagger UI so CSP doesn't block swagger-ui assets
-  app.use((req, res, next) => {
-    if (req.url?.startsWith('/api/docs')) return next();
-    return helmet()(req, res, next);
-  });
-
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      transform: true,
-      forbidNonWhitelisted: true,
-      transformOptions: {
-        enableImplicitConversion: true,
-      },
-    })
-  );
-
-
-  app.useGlobalInterceptors(new ClassSerializerInterceptor(app.get(Reflector)));
-
-
-  app.enableCors({
-    origin: process.env.ALLOWED_ORIGINS?.split(',') || 'http://localhost:3000',
-    credentials: true,
-  });
-
-
-  app.setGlobalPrefix('api/v1');
-
-  const config = new DocumentBuilder()
-    .setTitle('E-Commerce API')
-    .setDescription('API documentation for the e-commerce platform')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .build();
-
-  const document = SwaggerModule.createDocument(app, config);
-  // Enable Swagger when not in production, or when ENABLE_SWAGGER=true (e.g. on EC2 for viewing docs)
-  const enableSwagger =
-    process.env.NODE_ENV !== 'production' ||
-    process.env.ENABLE_SWAGGER === 'true' ||
-    process.env.ENABLE_SWAGGER === '1';
-  if (enableSwagger) {
-    SwaggerModule.setup('api/docs', app, document);
-  }
+  configureApp(app);
 
   const port = process.env.PORT || 3000;
 

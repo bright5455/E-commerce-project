@@ -17,6 +17,11 @@ import { config } from 'dotenv';
 
 config();
 
+const useSsl =
+  process.env.DB_SSL === 'true' ||
+  process.env.DB_SSL === '1' ||
+  process.env.NODE_ENV === 'production';
+
 export default new DataSource({
   type: 'postgres',
   host: process.env.DB_HOST,
@@ -28,4 +33,5 @@ export default new DataSource({
   entities: [__dirname + '/../**/*.entity.js'],
   migrations: [__dirname + '/../migrations/*.js'],
   synchronize: false,
+  ssl: useSsl ? { rejectUnauthorized: false } : false,
 });
